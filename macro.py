@@ -19,6 +19,35 @@ MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_ABSOLUTE = 0x8000
 MOUSEEVENTF_MOVE = 0x0001
 
+# Window constants
+SW_RESTORE = 9
+SW_SHOW = 5
+
+
+def find_roblox_window():
+    """Find the Roblox window handle"""
+    # Try different window class names Roblox uses
+    hwnd = user32.FindWindowW("WINDOWSCLIENT", None)  # Roblox UWP
+    if not hwnd:
+        hwnd = user32.FindWindowW("RobloxPlayerBeta", None)  # Roblox Player
+    if not hwnd:
+        # Search by title
+        hwnd = user32.FindWindowW(None, "Roblox")
+    return hwnd
+
+
+def focus_roblox():
+    """Focus the Roblox window"""
+    hwnd = find_roblox_window()
+    if hwnd:
+        # Restore if minimized
+        user32.ShowWindow(hwnd, SW_RESTORE)
+        # Bring to foreground
+        user32.SetForegroundWindow(hwnd)
+        time.sleep(0.3)  # Wait for window to focus
+        return True
+    return False
+
 
 class MOUSEINPUT(ctypes.Structure):
     _fields_ = [
@@ -72,6 +101,7 @@ class MacroController:
         from config import get_macro_button, get_macro_settings
         self.settings = get_macro_settings()
         self.buttons = {
+            "break_position": get_macro_button("break_position"),
             "inventory": get_macro_button("inventory"),
             "sell_tab": get_macro_button("sell_tab"),
             "select_all": get_macro_button("select_all"),
@@ -83,6 +113,7 @@ class MacroController:
         from config import get_macro_button, get_macro_settings
         self.settings = get_macro_settings()
         self.buttons = {
+            "break_position": get_macro_button("break_position"),
             "inventory": get_macro_button("inventory"),
             "sell_tab": get_macro_button("sell_tab"),
             "select_all": get_macro_button("select_all"),
@@ -154,7 +185,21 @@ class MacroController:
                 continue
             
             try:
-                # Step 1: Hold M1 to break rocks for the set duration
+                # Step 1: Focus Roblox and move to break position
+                self.update_status(f"Cycle {cycle}: Focusing Roblox...")
+                
+                if not focus_roblox():
+                    self.update_status("Error: Could not find Roblox window!")
+                    time.sleep(2)
+                    continue
+                
+                # Move mouse to break position
+                break_pos = self.buttons["break_position"]
+                self.update_status(f"Cycle {cycle}: Moving to break position...")
+                user32.SetCursorPos(break_pos["x"], break_pos["y"])
+                time.sleep(0.2)
+                
+                # Step 2: Hold M1 to break rocks for the set duration
                 self.update_status(f"Cycle {cycle}: Breaking rocks for {hold_minutes}min...")
                 
                 # Press and HOLD left mouse button
