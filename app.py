@@ -113,6 +113,49 @@ class StyledButton(tk.Canvas):
             self.command()
 
 
+class StyledCheckbox(tk.Canvas):
+    """Custom styled checkbox"""
+    
+    def __init__(self, parent, text, variable=None, command=None, **kwargs):
+        super().__init__(parent, width=200, height=24, 
+                        bg=parent.cget("bg"), highlightthickness=0, **kwargs)
+        
+        self.variable = variable or tk.BooleanVar()
+        self.command = command
+        self.text = text
+        self.parent_bg = parent.cget("bg")
+        
+        self.draw()
+        
+        self.bind("<Button-1>", self.toggle)
+        self.bind("<Enter>", lambda e: self.config(cursor="hand2"))
+    
+    def draw(self):
+        self.delete("all")
+        checked = self.variable.get()
+        
+        # Box
+        box_color = BG_PRIMARY if checked else BG_BUTTON
+        self.create_rectangle(2, 4, 18, 20, fill=box_color, outline="#444", width=1)
+        
+        # Checkmark
+        if checked:
+            self.create_line(6, 12, 9, 16, fill=FG_WHITE, width=2)
+            self.create_line(9, 16, 15, 7, fill=FG_WHITE, width=2)
+        
+        # Text
+        self.create_text(26, 12, text=self.text, anchor=tk.W, fill=FG_WHITE, font=("Arial", 10))
+    
+    def toggle(self, e=None):
+        self.variable.set(not self.variable.get())
+        self.draw()
+        if self.command:
+            self.command()
+    
+    def get(self):
+        return self.variable.get()
+
+
 class AuthWindow:
     """License activation window"""
     
@@ -918,17 +961,13 @@ class SettingsWindow:
         
         # Auto mode
         self.auto_var = tk.BooleanVar(value=self.settings.get("preferences", {}).get("auto_mode", True))
-        auto_cb = tk.Checkbutton(prefs_card, text="Auto-detect Forge UI", variable=self.auto_var, 
-                                 font=("Arial", 11), bg=BG_CARD, fg=FG_WHITE, 
-                                 selectcolor=BG_DARK, activebackground=BG_CARD, activeforeground=FG_WHITE)
-        auto_cb.pack(anchor=tk.W, pady=3)
+        self.auto_cb = StyledCheckbox(prefs_card, text="Auto-detect Forge UI", variable=self.auto_var)
+        self.auto_cb.pack(anchor=tk.W, pady=4)
         
         # Always on top
         self.topmost_var = tk.BooleanVar(value=self.settings.get("preferences", {}).get("always_on_top", True))
-        top_cb = tk.Checkbutton(prefs_card, text="Always on top", variable=self.topmost_var, 
-                                font=("Arial", 11), bg=BG_CARD, fg=FG_WHITE, 
-                                selectcolor=BG_DARK, activebackground=BG_CARD, activeforeground=FG_WHITE)
-        top_cb.pack(anchor=tk.W, pady=3)
+        self.top_cb = StyledCheckbox(prefs_card, text="Always on top", variable=self.topmost_var)
+        self.top_cb.pack(anchor=tk.W, pady=4)
         
         # Buttons at bottom
         btn_frame = tk.Frame(self.window, bg=BG_DARK)
