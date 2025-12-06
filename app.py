@@ -1052,7 +1052,7 @@ class SettingsWindow:
         self.window.resizable(False, False)
         self.window.configure(bg=BG_DARK)
         self.window.transient(parent)
-        self.window.grab_set()
+        # Don't use grab_set - it blocks child windows
         
         # Dark title bar
         set_dark_titlebar(self.window)
@@ -1304,7 +1304,7 @@ class MacroSettingsWindow:
         self.window.resizable(False, False)
         self.window.configure(bg=BG_DARK)
         self.window.transient(parent)
-        self.window.grab_set()
+        # Don't use grab_set - it blocks child windows
         
         set_dark_titlebar(self.window)
         
