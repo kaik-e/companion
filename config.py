@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
         "sell_tab": None,        # Click position for Sell tab
         "select_all": None,      # Click position for Select All button
         "accept": None,          # Click position for Accept/Confirm button
+        "close_menu": None,      # Click position for X button to close menu
     },
     "macro_settings": {
         "enabled": False,
@@ -143,5 +144,6 @@ def is_macro_setup_complete() -> bool:
         buttons.get("inventory"),
         buttons.get("sell_tab"),
         buttons.get("select_all"),
-        buttons.get("accept")
+        buttons.get("accept"),
+        buttons.get("close_menu")
     ])

@@ -106,6 +106,7 @@ class MacroController:
             "sell_tab": get_macro_button("sell_tab"),
             "select_all": get_macro_button("select_all"),
             "accept": get_macro_button("accept"),
+            "close_menu": get_macro_button("close_menu"),
         }
     
     def reload_settings(self):
@@ -118,6 +119,7 @@ class MacroController:
             "sell_tab": get_macro_button("sell_tab"),
             "select_all": get_macro_button("select_all"),
             "accept": get_macro_button("accept"),
+            "close_menu": get_macro_button("close_menu"),
         }
     
     def update_status(self, status):
@@ -210,19 +212,18 @@ class MacroController:
                 while elapsed < hold_seconds and self.running and not self.paused:
                     # Check hotkey every second
                     if self.check_stop_hotkey():
-                        self.update_status("Hotkey pressed - stopping...")
+                        self.update_status("Stopping...")
                         self.running = False
                         break
                     
                     time.sleep(1)
                     elapsed += 1
                     
-                    # Update status every 10 seconds
-                    if elapsed % 10 == 0:
-                        remaining = hold_seconds - elapsed
-                        mins = remaining // 60
-                        secs = remaining % 60
-                        self.update_status(f"Cycle {cycle}: Breaking... {mins}:{secs:02d} left (F6/ESC to stop)")
+                    # Update status every second with realtime countdown
+                    remaining = hold_seconds - elapsed
+                    mins = remaining // 60
+                    secs = remaining % 60
+                    self.update_status(f"Cycle {cycle}: {mins}:{secs:02d}")
                 
                 # Release click
                 user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
@@ -268,10 +269,20 @@ class MacroController:
                     click_at(accept_pos["x"], accept_pos["y"])
                     time.sleep(0.5)
                     
+                    if self.check_stop_hotkey():
+                        self.running = False
+                        break
+                    
+                    # Click X to close menu
+                    self.update_status("Closing menu...")
+                    close_pos = self.buttons["close_menu"]
+                    click_at(close_pos["x"], close_pos["y"])
+                    time.sleep(0.3)
+                    
                     self.update_status(f"Cycle {cycle} complete! Starting next...")
                 
                 cycle += 1
-                time.sleep(1)
+                time.sleep(0.5)
                 
             except Exception as e:
                 self.update_status(f"Macro error: {e}")

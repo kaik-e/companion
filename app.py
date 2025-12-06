@@ -1320,7 +1320,7 @@ class MacroSettingsWindow:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Macro Settings")
-        self.window.geometry("400x560")
+        self.window.geometry("400x600")
         self.window.resizable(False, False)
         self.window.configure(bg=BG_DARK)
         self.window.transient(parent)
@@ -1331,8 +1331,8 @@ class MacroSettingsWindow:
         # Center
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() - 400) // 2
-        y = (self.window.winfo_screenheight() - 560) // 2
-        self.window.geometry(f"400x560+{x}+{y}")
+        y = (self.window.winfo_screenheight() - 600) // 2
+        self.window.geometry(f"400x600+{x}+{y}")
         
         self.setup_ui()
     
@@ -1369,6 +1369,9 @@ class MacroSettingsWindow:
         
         # Accept button
         self._create_button_row(buttons_card, "Accept", "accept")
+        
+        # Close menu (X button)
+        self._create_button_row(buttons_card, "Close (X)", "close_menu")
         
         # Duration section
         tk.Label(content, text="Settings", font=("Arial", 11, "bold"), bg=BG_DARK, fg=FG_GOLD).pack(anchor=tk.W, pady=(10, 10))
@@ -1446,7 +1449,8 @@ class MacroSettingsWindow:
             "inventory": "Click on the INVENTORY button",
             "sell_tab": "Click on the SELL tab",
             "select_all": "Click on the SELECT ALL button",
-            "accept": "Click on the ACCEPT button"
+            "accept": "Click on the ACCEPT button",
+            "close_menu": "Click on the X button to CLOSE menu"
         }
         
         def on_picked(position):
