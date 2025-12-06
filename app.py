@@ -389,8 +389,153 @@ class ForgerCompanion:
         self.main_content = tk.Frame(self.root, bg=self.bg_color)
         self.main_content.pack(fill=tk.BOTH, expand=True)
         
+        # === TAB BAR ===
+        tab_bar = tk.Frame(self.main_content, bg=BG_CARD, height=40)
+        tab_bar.pack(fill=tk.X, padx=8, pady=(8, 0))
+        tab_bar.pack_propagate(False)
+        
+        self.current_tab = "macro"
+        
+        # Tab buttons
+        tab_frame = tk.Frame(tab_bar, bg=BG_CARD)
+        tab_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+        
+        self.macro_tab_btn = StyledButton(tab_frame, text="Macro", command=lambda: self.switch_tab("macro"),
+                                          width=70, height=28, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
+                                          font=("Arial", 9), bold=True)
+        self.macro_tab_btn.pack(side=tk.LEFT, padx=2)
+        
+        self.calc_tab_btn = StyledButton(tab_frame, text="Calculator", command=lambda: self.switch_tab("calc"),
+                                         width=80, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                         font=("Arial", 9))
+        self.calc_tab_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Settings button on right
+        settings_frame = tk.Frame(tab_bar, bg=BG_CARD)
+        settings_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=5, pady=5)
+        
+        self.settings_btn = StyledButton(settings_frame, text="⚙", command=self.open_settings,
+                                         width=30, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                         font=("Arial", 10))
+        self.settings_btn.pack(side=tk.RIGHT)
+        
+        # === PAGE CONTAINER ===
+        self.page_container = tk.Frame(self.main_content, bg=self.bg_color)
+        self.page_container.pack(fill=tk.BOTH, expand=True)
+        
+        # Create pages
+        self.macro_page = tk.Frame(self.page_container, bg=self.bg_color)
+        self.calc_page = tk.Frame(self.page_container, bg=self.bg_color)
+        
+        self.setup_macro_page()
+        self.setup_calc_page()
+        
+        # Show macro page by default
+        self.macro_page.pack(fill=tk.BOTH, expand=True)
+    
+    def switch_tab(self, tab):
+        """Switch between tabs"""
+        if tab == self.current_tab:
+            return
+        
+        self.current_tab = tab
+        
+        # Update tab button styles
+        if tab == "macro":
+            self.macro_tab_btn.bg_normal = BG_PRIMARY
+            self.macro_tab_btn.draw_button(BG_PRIMARY)
+            self.calc_tab_btn.bg_normal = BG_BUTTON
+            self.calc_tab_btn.draw_button(BG_BUTTON)
+            self.calc_page.pack_forget()
+            self.macro_page.pack(fill=tk.BOTH, expand=True)
+        else:
+            self.calc_tab_btn.bg_normal = BG_PRIMARY
+            self.calc_tab_btn.draw_button(BG_PRIMARY)
+            self.macro_tab_btn.bg_normal = BG_BUTTON
+            self.macro_tab_btn.draw_button(BG_BUTTON)
+            self.macro_page.pack_forget()
+            self.calc_page.pack(fill=tk.BOTH, expand=True)
+    
+    def setup_macro_page(self):
+        """Setup the macro control page"""
+        from macro import MacroController
+        
+        self.macro_controller = MacroController(on_status_change=self.on_macro_status)
+        
+        # Center content
+        content = tk.Frame(self.macro_page, bg=self.bg_color)
+        content.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
+        
+        # Status indicator
+        self.macro_status_indicator = tk.Label(content, text="●", font=("Arial", 48), bg=self.bg_color, fg="#666")
+        self.macro_status_indicator.pack(pady=(20, 10))
+        
+        self.macro_status_label = tk.Label(content, text="Macro Ready", font=("Arial", 14, "bold"), 
+                                           bg=self.bg_color, fg=FG_WHITE)
+        self.macro_status_label.pack(pady=(0, 5))
+        
+        self.macro_detail_label = tk.Label(content, text="Configure in Settings → Macro", font=("Arial", 10), 
+                                           bg=self.bg_color, fg=FG_DIM)
+        self.macro_detail_label.pack(pady=(0, 30))
+        
+        # Big start/stop button
+        self.macro_btn = StyledButton(content, text="▶ Start Macro", command=self.toggle_macro,
+                                      width=160, height=50, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
+                                      font=("Arial", 14), bold=True)
+        self.macro_btn.pack(pady=10)
+        
+        # Timer display
+        self.timer_label = tk.Label(content, text="", font=("Arial", 24, "bold"), bg=self.bg_color, fg=FG_GOLD)
+        self.timer_label.pack(pady=20)
+        
+        # Info card
+        info_card = tk.Frame(content, bg=BG_CARD, padx=20, pady=15)
+        info_card.pack(fill=tk.X, pady=(20, 0))
+        
+        from config import get_macro_settings, is_macro_setup_complete
+        settings = get_macro_settings()
+        is_setup = is_macro_setup_complete()
+        
+        if is_setup:
+            duration = settings.get("hold_duration", 5)
+            auto_sell = "On" if settings.get("auto_sell", True) else "Off"
+            info_text = f"Duration: {duration} min  •  Auto-sell: {auto_sell}"
+            info_color = FG_DIM
+        else:
+            info_text = "⚠ Macro not configured - Go to Settings → Macro"
+            info_color = FG_GOLD
+        
+        tk.Label(info_card, text=info_text, font=("Arial", 10), bg=BG_CARD, fg=info_color).pack()
+    
+    def toggle_macro(self):
+        """Start or stop the macro"""
+        if self.macro_controller.running:
+            self.macro_controller.stop()
+            self.macro_btn.text = "▶ Start Macro"
+            self.macro_btn.bg_normal = BG_PRIMARY
+            self.macro_btn.draw_button(BG_PRIMARY)
+            self.macro_status_indicator.config(fg="#666")
+        else:
+            from config import is_macro_setup_complete
+            if not is_macro_setup_complete():
+                self.macro_status_label.config(text="Configure macro first!")
+                self.macro_detail_label.config(text="Go to Settings → Macro → Configure")
+                return
+            
+            if self.macro_controller.start():
+                self.macro_btn.text = "⏹ Stop Macro"
+                self.macro_btn.bg_normal = BG_DANGER
+                self.macro_btn.draw_button(BG_DANGER)
+                self.macro_status_indicator.config(fg=FG_GREEN)
+    
+    def on_macro_status(self, status):
+        """Called when macro status changes"""
+        self.root.after(0, lambda: self.macro_status_label.config(text=status))
+    
+    def setup_calc_page(self):
+        """Setup the calculator page (auto-detection)"""
         # Controls bar
-        controls = tk.Frame(self.main_content, bg=BG_CARD, height=44)
+        controls = tk.Frame(self.calc_page, bg=BG_CARD, height=44)
         controls.pack(fill=tk.X, padx=8, pady=(8, 4))
         controls.pack_propagate(False)
         
@@ -406,12 +551,6 @@ class ForgerCompanion:
                                      width=50, height=28, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
                                      font=("Arial", 9), bold=True)
         self.auto_btn.pack(side=tk.LEFT, padx=2)
-        
-        # Settings button
-        self.settings_btn = StyledButton(left_controls, text="⚙", command=self.open_settings,
-                                         width=30, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
-                                         font=("Arial", 10))
-        self.settings_btn.pack(side=tk.LEFT, padx=2)
         
         # Right side - Enhancement controls
         right_controls = tk.Frame(controls, bg=BG_CARD)
@@ -430,11 +569,11 @@ class ForgerCompanion:
                                          font=("Arial", 11), bold=True)
         self.enh_plus_btn.pack(side=tk.LEFT, padx=2)
         
-        # Main content area
-        self.content = tk.Frame(self.main_content, bg=self.bg_color)
+        # Main content area for calculator
+        self.content = tk.Frame(self.calc_page, bg=self.bg_color)
         self.content.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        self.setup_content()
+        self.setup_calc_content()
     
     def start_drag(self, event):
         self.drag_data["x"] = event.x
@@ -459,7 +598,8 @@ class ForgerCompanion:
             self.root.geometry("420x36")
             self.minimized = True
     
-    def setup_content(self):
+    def setup_calc_content(self):
+        """Setup calculator content (ore slots, results, etc.)"""
         # === MULTI LABEL ===
         tk.Label(self.content, text="MULTI", font=("Arial", 9), bg=self.bg_color, fg=self.dim_color).pack()
         self.multiplier_label = tk.Label(self.content, text="0.00x", font=("Arial", 28, "bold"), bg=self.bg_color, fg=self.fg_color)
@@ -522,8 +662,8 @@ class ForgerCompanion:
         self.armor_traits_label = tk.Label(self.content, text="", font=("Arial", 9), bg=self.bg_color, fg="#ccc", wraplength=380)
         self.armor_traits_label.pack(pady=2)
         
-        # Status bar at bottom
-        status_frame = tk.Frame(self.main_content, bg=BG_CARD)
+        # Status bar at bottom of calc page
+        status_frame = tk.Frame(self.calc_page, bg=BG_CARD)
         status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=8, pady=8)
         
         self.status_label = tk.Label(status_frame, text="Waiting for Forge UI...", font=("Arial", 9), bg=BG_CARD, fg=FG_DIM, anchor=tk.W)
