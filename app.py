@@ -350,7 +350,9 @@ class ForgerCompanion:
             from PIL import Image, ImageTk
             import os
             logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
-            logo_img = Image.open(logo_path).resize((20, 20), Image.Resampling.LANCZOS)
+            logo_img = Image.open(logo_path)
+            # Resize maintaining aspect ratio
+            logo_img.thumbnail((20, 20), Image.Resampling.LANCZOS)
             self.logo_photo = ImageTk.PhotoImage(logo_img)
             logo_lbl = tk.Label(title_left, image=self.logo_photo, bg="#151515")
             logo_lbl.pack(side=tk.LEFT, pady=8)
