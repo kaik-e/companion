@@ -1,6 +1,7 @@
 """First-time setup wizard for Forger Companion"""
 
 import tkinter as tk
+from tkinter import messagebox
 from config import save_settings, load_settings, mark_setup_complete
 
 
@@ -11,24 +12,18 @@ class SetupWizard:
         {
             "title": "Welcome to Forger Companion!",
             "description": "This quick setup will help you configure the app.\n\nWe'll ask you to select a few screen regions so the app can automatically detect when you're forging.",
-            "region": None,  # No region to set
+            "region": None,
             "icon": "⚒"
         },
         {
-            "title": "Step 1: Ores Panel",
-            "description": "Open the Forge UI in-game, then click 'Select Region' and drag to select the ORES PANEL on the right side.\n\nThis is the panel that shows 'Forge / Select Ores' with your ore inventory.",
-            "region": "ores_panel",
-            "icon": "📦"
-        },
-        {
-            "title": "Step 2: Forge Slots",
-            "description": "Now select the area with the 4 ORE SLOTS in the middle of the screen.\n\nThis is where you place ores to forge (shows 'Empty' slots and the Multiplier).",
+            "title": "Step 1: Forge Slots",
+            "description": "Open the Forge UI in-game, then click 'Select Region' and drag to select the 4 ORE SLOTS area in the middle.\n\nThis includes the slots where you place ores and the Multiplier display.",
             "region": "forge_slots",
             "icon": "🔲"
         },
         {
             "title": "Setup Complete!",
-            "description": "You're all set! The app will now:\n\n• Auto-detect when you open the Forge UI\n• Scan your selected ores automatically\n• Show forge results in real-time\n\nYou can reconfigure regions anytime from Settings.",
+            "description": "You're all set! The app will now:\n\n• Auto-detect when you open the Forge UI\n• Scan your selected ores automatically\n• Show forge results in real-time\n\nYou can reconfigure regions anytime from Settings (⚙).",
             "region": None,
             "icon": "✓"
         }
@@ -38,16 +33,25 @@ class SetupWizard:
         self.on_complete = on_complete
         self.current_step = 0
         self.settings = load_settings()
+        self.completed = False
         
         self.root = tk.Tk()
         self.root.title("Forger Companion - Setup")
-        self.root.geometry("500x400")
+        self.root.geometry("500x380")
         self.root.resizable(False, False)
         self.root.configure(bg="#0d0d0d")
-        self.root.eval('tk::PlaceWindow . center')
+        
+        # Center window
+        self.root.update_idletasks()
+        x = (self.root.winfo_screenwidth() - 500) // 2
+        y = (self.root.winfo_screenheight() - 380) // 2
+        self.root.geometry(f"500x380+{x}+{y}")
         
         self.setup_ui()
         self.show_step(0)
+        
+        # Handle window close
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
     
     def setup_ui(self):
         # Header
@@ -243,19 +247,28 @@ class SetupWizard:
             self.next_btn.config(state=tk.NORMAL, bg="#2d5a2d")
     
     def skip_setup(self):
-        if tk.messagebox.askyesno(
+        if messagebox.askyesno(
             "Skip Setup?",
             "You can always configure regions later from Settings.\n\nSkip setup for now?"
         ):
             self.complete()
     
+    def on_close(self):
+        """Handle window close button"""
+        if messagebox.askyesno("Exit Setup?", "Exit setup and close the app?"):
+            self.root.destroy()
+            # Don't call on_complete - just exit
+    
     def complete(self):
+        self.completed = True
         mark_setup_complete()
         self.root.destroy()
-        self.on_complete()
     
     def run(self):
         self.root.mainloop()
+        # After mainloop ends, call on_complete if setup was completed
+        if self.completed:
+            self.on_complete()
 
 
 class RegionSelector:

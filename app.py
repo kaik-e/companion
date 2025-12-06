@@ -15,6 +15,8 @@ class AuthWindow:
     
     def __init__(self, on_success):
         self.on_success = on_success
+        self.activated = False
+        
         self.root = tk.Tk()
         self.root.title("Forger Companion - Activation")
         self.root.geometry("400x280")
@@ -22,7 +24,10 @@ class AuthWindow:
         self.root.configure(bg="#0d0d0d")
         
         # Center window
-        self.root.eval('tk::PlaceWindow . center')
+        self.root.update_idletasks()
+        x = (self.root.winfo_screenwidth() - 400) // 2
+        y = (self.root.winfo_screenheight() - 280) // 2
+        self.root.geometry(f"400x280+{x}+{y}")
         
         # Logo/Title
         tk.Label(
@@ -136,11 +141,14 @@ class AuthWindow:
             self.status_label.config(text=f"✗ {error}", fg="#ff4444")
     
     def success(self):
+        self.activated = True
         self.root.destroy()
-        self.on_success()
     
     def run(self):
         self.root.mainloop()
+        # After mainloop ends, call on_success if activated
+        if self.activated:
+            self.on_success()
 
 
 class ForgerCompanion:
