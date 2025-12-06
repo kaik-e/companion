@@ -37,14 +37,30 @@ def find_roblox_window():
 
 
 def focus_roblox():
-    """Focus the Roblox window"""
+    """Focus the Roblox window and click to activate it"""
     hwnd = find_roblox_window()
     if hwnd:
         # Restore if minimized
         user32.ShowWindow(hwnd, SW_RESTORE)
         # Bring to foreground
         user32.SetForegroundWindow(hwnd)
-        time.sleep(0.3)  # Wait for window to focus
+        time.sleep(0.3)
+        
+        # Get window rect and click in center to activate
+        import ctypes
+        rect = ctypes.wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        center_x = (rect.left + rect.right) // 2
+        center_y = (rect.top + rect.bottom) // 2
+        
+        # Move and click to activate the window
+        user32.SetCursorPos(center_x, center_y)
+        time.sleep(0.1)
+        user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        time.sleep(0.05)
+        user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+        time.sleep(0.2)
+        
         return True
     return False
 
@@ -71,37 +87,14 @@ class INPUT(ctypes.Structure):
 
 def click_at(x, y):
     """Click at specific screen coordinates"""
-    import ctypes
-    
     # Move mouse first
     user32.SetCursorPos(x, y)
     time.sleep(0.15)
     
-    # Try multiple click methods for compatibility
-    
-    # Method 1: mouse_event (older but sometimes works better)
+    # Click
     user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
     time.sleep(0.08)
     user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-    time.sleep(0.05)
-    
-    # Method 2: Also send via SendInput for games that need it
-    extra = ctypes.c_ulong(0)
-    ii_ = INPUT()
-    ii_.type = INPUT_MOUSE
-    ii_._input.mi.dx = 0
-    ii_._input.mi.dy = 0
-    ii_._input.mi.mouseData = 0
-    ii_._input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN
-    ii_._input.mi.time = 0
-    ii_._input.mi.dwExtraInfo = ctypes.pointer(extra)
-    user32.SendInput(1, ctypes.pointer(ii_), ctypes.sizeof(ii_))
-    
-    time.sleep(0.08)
-    
-    ii_._input.mi.dwFlags = MOUSEEVENTF_LEFTUP
-    user32.SendInput(1, ctypes.pointer(ii_), ctypes.sizeof(ii_))
-    
     time.sleep(0.1)
 
 
