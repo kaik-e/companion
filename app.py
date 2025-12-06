@@ -302,7 +302,19 @@ class ForgerCompanion:
         title_left = tk.Frame(self.title_bar, bg="#151515")
         title_left.pack(side=tk.LEFT, fill=tk.Y, padx=10)
         
-        tk.Label(title_left, text="⚒", font=("Arial", 14), bg="#151515", fg=FG_GOLD).pack(side=tk.LEFT, pady=8)
+        # Load logo
+        try:
+            from PIL import Image, ImageTk
+            import os
+            logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+            logo_img = Image.open(logo_path).resize((20, 20), Image.Resampling.LANCZOS)
+            self.logo_photo = ImageTk.PhotoImage(logo_img)
+            logo_lbl = tk.Label(title_left, image=self.logo_photo, bg="#151515")
+            logo_lbl.pack(side=tk.LEFT, pady=8)
+        except:
+            # Fallback to emoji if logo fails
+            tk.Label(title_left, text="⚒", font=("Arial", 14), bg="#151515", fg=FG_GOLD).pack(side=tk.LEFT, pady=8)
+        
         title_lbl = tk.Label(title_left, text="Forger Companion", font=("Arial", 10, "bold"), bg="#151515", fg=FG_WHITE)
         title_lbl.pack(side=tk.LEFT, padx=8, pady=8)
         title_lbl.bind("<Button-1>", self.start_drag)
@@ -349,11 +361,6 @@ class ForgerCompanion:
                                      width=50, height=28, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
                                      font=("Arial", 9), bold=True)
         self.auto_btn.pack(side=tk.LEFT, padx=2)
-        
-        self.scan_btn = StyledButton(left_controls, text="▶ Scan", command=self.toggle_scan,
-                                     width=60, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
-                                     font=("Arial", 9))
-        self.scan_btn.pack(side=tk.LEFT, padx=2)
         
         # Settings button
         self.settings_btn = StyledButton(left_controls, text="⚙", command=self.open_settings,
@@ -557,16 +564,6 @@ class ForgerCompanion:
             self.auto_indicator.config(fg="#666")
             self.status_label.config(text="Auto mode: OFF")
         
-    def toggle_scan(self):
-        self.scanning = not self.scanning
-        if self.scanning:
-            self.scan_btn.config(text="⏸ Stop", bg="#5a2d2d")
-            self.status_label.config(text="Scanning...")
-            threading.Thread(target=self.scan_loop, daemon=True).start()
-        else:
-            self.scan_btn.config(text="▶ Scan", bg="#2d5a2d")
-            self.status_label.config(text="Stopped")
-    
     def scan_loop(self):
         while self.scanning:
             try:
