@@ -5,12 +5,44 @@ from tkinter import messagebox
 import threading
 import time
 import sys
+import platform
 
 # Auth check before heavy imports
 from auth import check_license, validate_key, get_license_info
 
 
 # ============ UI STYLING ============
+
+def set_dark_titlebar(window):
+    """Set dark title bar on Windows 10/11"""
+    if platform.system() != "Windows":
+        return
+    
+    try:
+        import ctypes
+        window.update()
+        
+        # Get window handle
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        
+        # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Windows 10 build 18985+)
+        # DWMWA_USE_IMMERSIVE_DARK_MODE = 19 (older Windows 10)
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+        
+        # Enable dark mode for title bar
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, 
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(ctypes.c_int(1)), 
+            ctypes.sizeof(ctypes.c_int)
+        )
+        
+        # Force redraw
+        window.withdraw()
+        window.deiconify()
+    except Exception as e:
+        print(f"[ui] Could not set dark titlebar: {e}")
+
 
 # Colors
 BG_DARK = "#0d0d0d"
@@ -93,6 +125,9 @@ class AuthWindow:
         self.root.geometry("420x320")
         self.root.resizable(False, False)
         self.root.configure(bg=BG_DARK)
+        
+        # Dark title bar
+        set_dark_titlebar(self.root)
         
         # Center window
         self.root.update_idletasks()
@@ -206,14 +241,17 @@ class ForgerCompanion:
         self.root.attributes("-alpha", 0.95)
         self.root.resizable(True, True)
         
-        # Dark theme - matching forge result image
-        self.bg_color = "#0d0d0d"
-        self.fg_color = "#ffffff"
-        self.dim_color = "#9a9a9a"
-        self.gold_color = "#ffdb4a"
-        self.red_color = "#ff4444"
+        # Dark theme
+        self.bg_color = BG_DARK
+        self.fg_color = FG_WHITE
+        self.dim_color = FG_DIM
+        self.gold_color = FG_GOLD
+        self.red_color = FG_RED
         
         self.root.configure(bg=self.bg_color)
+        
+        # Dark title bar
+        set_dark_titlebar(self.root)
         
         # Load saved settings
         from config import load_settings, get_region
@@ -380,42 +418,54 @@ class ForgerCompanion:
     
     def start_auto_detect(self):
         """Start background thread for auto-detecting forge UI"""
+        self.waiting_for_ores = False
+        
         def auto_detect_loop():
             while self.auto_mode:
                 try:
                     from ocr_scanner import detect_forge_ui
-                    is_forge, _ = detect_forge_ui(self.scan_region)
+                    is_forge, has_ores, _ = detect_forge_ui(self.scan_region)
                     
                     # Update UI in main thread
-                    self.root.after(0, lambda v=is_forge: self.on_forge_ui_detected(v))
+                    self.root.after(0, lambda f=is_forge, o=has_ores: self.on_forge_ui_detected(f, o))
                     
                 except Exception as e:
                     print(f"[auto] Detection error: {e}")
                 
-                time.sleep(1.5)  # Check every 1.5 seconds
+                # Faster polling when waiting for ores, slower otherwise
+                sleep_time = 1.0 if self.waiting_for_ores else 2.0
+                time.sleep(sleep_time)
         
         threading.Thread(target=auto_detect_loop, daemon=True).start()
     
-    def on_forge_ui_detected(self, visible):
+    def on_forge_ui_detected(self, visible, has_ores):
         """Called when forge UI detection state changes"""
-        if visible != self.forge_ui_visible:
-            self.forge_ui_visible = visible
-            
-            if visible:
-                # Forge UI appeared - start scanning
-                self.auto_indicator.config(fg="#4ade80")  # Green
-                self.status_label.config(text="Forge UI detected!")
+        prev_visible = self.forge_ui_visible
+        self.forge_ui_visible = visible
+        
+        if visible:
+            if has_ores:
+                # Ores are placed - start scanning!
+                self.waiting_for_ores = False
+                self.auto_indicator.config(fg=FG_GREEN)
+                self.status_label.config(text="Scanning ores...")
                 if not self.scanning:
                     self.scanning = True
-                    self.scan_btn.config(text="⏸ Stop", bg="#5a2d2d")
                     threading.Thread(target=self.scan_loop, daemon=True).start()
             else:
-                # Forge UI gone - stop scanning
-                self.auto_indicator.config(fg="#666")  # Gray
-                self.status_label.config(text="Waiting for Forge UI...")
+                # Forge UI open but no ores yet - waiting
+                self.waiting_for_ores = True
+                self.auto_indicator.config(fg=FG_GOLD)  # Yellow - waiting
+                self.status_label.config(text="Forge UI open - place ores...")
                 self.scanning = False
-                self.scan_btn.config(text="▶ Scan", bg="#333")
                 self.clear_display()
+        else:
+            # Forge UI closed
+            self.waiting_for_ores = False
+            self.auto_indicator.config(fg="#666")
+            self.status_label.config(text="Waiting for Forge UI...")
+            self.scanning = False
+            self.clear_display()
     
     def toggle_auto_mode(self):
         """Toggle auto-detection mode"""
@@ -632,18 +682,18 @@ class ForgerCompanion:
         content = tk.Frame(self.tutorial_frame, bg=BG_DARK)
         content.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         
-        tk.Label(content, text="👋", font=("Arial", 40), bg=BG_DARK, fg=FG_WHITE).pack(pady=(0, 10))
+        tk.Label(content, text="⚒", font=("Arial", 44), bg=BG_DARK, fg=FG_GOLD).pack(pady=(0, 10))
         tk.Label(content, text="Welcome!", font=("Arial", 22, "bold"), bg=BG_DARK, fg=FG_WHITE).pack(pady=(0, 5))
-        tk.Label(content, text="Quick Setup", font=("Arial", 11), bg=BG_DARK, fg=FG_GOLD).pack(pady=(0, 25))
+        tk.Label(content, text="How it works", font=("Arial", 11), bg=BG_DARK, fg=FG_DIM).pack(pady=(0, 25))
         
         # Instructions in a card
         card = tk.Frame(content, bg=BG_CARD, padx=25, pady=20)
         card.pack(pady=(0, 25))
         
         steps = [
-            ("1.", "Open the Forge UI in-game"),
-            ("2.", "Click 'Set Region' and select the ore slots area"),
-            ("3.", "The app will auto-detect when you're forging!")
+            ("1.", "Open the Forge UI in Roblox"),
+            ("2.", "Place ores in the forge slots"),
+            ("3.", "Results appear automatically!")
         ]
         
         for num, text in steps:
@@ -652,20 +702,31 @@ class ForgerCompanion:
             tk.Label(step_frame, text=num, font=("Arial", 11, "bold"), bg=BG_CARD, fg=FG_GOLD, width=2).pack(side=tk.LEFT)
             tk.Label(step_frame, text=text, font=("Arial", 11), bg=BG_CARD, fg=FG_WHITE, anchor=tk.W).pack(side=tk.LEFT, padx=5)
         
+        # Status indicators explanation
+        indicator_frame = tk.Frame(content, bg=BG_DARK)
+        indicator_frame.pack(pady=(0, 20))
+        
+        tk.Label(indicator_frame, text="●", font=("Arial", 12), bg=BG_DARK, fg="#666").pack(side=tk.LEFT)
+        tk.Label(indicator_frame, text="Waiting  ", font=("Arial", 9), bg=BG_DARK, fg=FG_DIM).pack(side=tk.LEFT)
+        tk.Label(indicator_frame, text="●", font=("Arial", 12), bg=BG_DARK, fg=FG_GOLD).pack(side=tk.LEFT)
+        tk.Label(indicator_frame, text="Forge Open  ", font=("Arial", 9), bg=BG_DARK, fg=FG_DIM).pack(side=tk.LEFT)
+        tk.Label(indicator_frame, text="●", font=("Arial", 12), bg=BG_DARK, fg=FG_GREEN).pack(side=tk.LEFT)
+        tk.Label(indicator_frame, text="Scanning", font=("Arial", 9), bg=BG_DARK, fg=FG_DIM).pack(side=tk.LEFT)
+        
         # Buttons
         btn_frame = tk.Frame(content, bg=BG_DARK)
         btn_frame.pack(pady=(0, 10))
         
-        StyledButton(btn_frame, text="Set Region", command=self.tutorial_set_region,
-                    width=130, height=38, bg=BG_ACCENT, bg_hover="#6a6a3d",
+        StyledButton(btn_frame, text="Got it!", command=self.close_tutorial,
+                    width=120, height=38, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
                     font=("Arial", 11), bold=True).pack(side=tk.LEFT, padx=8)
         
-        StyledButton(btn_frame, text="Skip", command=self.close_tutorial,
-                    width=80, height=38, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
-                    font=("Arial", 10), fg=FG_DIM).pack(side=tk.LEFT, padx=8)
+        StyledButton(btn_frame, text="Set Region", command=self.tutorial_set_region,
+                    width=100, height=38, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 10)).pack(side=tk.LEFT, padx=8)
     
     def tutorial_set_region(self):
-        """Set region from tutorial"""
+        """Set region from tutorial (optional - for advanced users)"""
         self.tutorial_frame.destroy()
         
         def on_region(region):
@@ -679,19 +740,19 @@ class ForgerCompanion:
                 settings["setup_complete"] = True
                 save_settings(settings)
                 
-                self.status_label.config(text=f"Region saved! Ready to scan.")
+                self.status_label.config(text="Region saved!")
             else:
-                self.status_label.config(text="No region set - use Settings (⚙) later")
-                # Still mark complete so tutorial doesn't show again
+                # Mark complete anyway
                 from config import save_settings, load_settings
                 settings = load_settings()
                 settings["setup_complete"] = True
                 save_settings(settings)
+                self.status_label.config(text="Waiting for Forge UI...")
         
         RegionSelector(self.root, on_region)
     
     def close_tutorial(self):
-        """Close tutorial without setting region"""
+        """Close tutorial"""
         self.tutorial_frame.destroy()
         
         # Mark setup complete
@@ -700,7 +761,7 @@ class ForgerCompanion:
         settings["setup_complete"] = True
         save_settings(settings)
         
-        self.status_label.config(text="Use Settings (⚙) to set region later")
+        self.status_label.config(text="Waiting for Forge UI...")
     
     def run(self):
         self.root.mainloop()
@@ -720,6 +781,9 @@ class SettingsWindow:
         self.window.configure(bg=BG_DARK)
         self.window.transient(parent)
         self.window.grab_set()
+        
+        # Dark title bar
+        set_dark_titlebar(self.window)
         
         # Center on screen
         self.window.update_idletasks()
