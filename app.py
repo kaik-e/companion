@@ -382,6 +382,32 @@ class ForgerCompanion:
         self.content = tk.Frame(self.main_content, bg=self.bg_color)
         self.content.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
+        self.setup_content()
+    
+    def start_drag(self, event):
+        self.drag_data["x"] = event.x
+        self.drag_data["y"] = event.y
+    
+    def do_drag(self, event):
+        x = self.root.winfo_x() + event.x - self.drag_data["x"]
+        y = self.root.winfo_y() + event.y - self.drag_data["y"]
+        self.root.geometry(f"+{x}+{y}")
+    
+    def toggle_collapse(self):
+        if self.minimized:
+            # Expand
+            self.main_content.pack(fill=tk.BOTH, expand=True)
+            self.collapse_btn.config(text="▼")
+            self.root.geometry("420x550")
+            self.minimized = False
+        else:
+            # Collapse
+            self.main_content.pack_forget()
+            self.collapse_btn.config(text="▲")
+            self.root.geometry("420x36")
+            self.minimized = True
+    
+    def setup_content(self):
         # === MULTI LABEL ===
         tk.Label(self.content, text="MULTI", font=("Arial", 9), bg=self.bg_color, fg=self.dim_color).pack()
         self.multiplier_label = tk.Label(self.content, text="0.00x", font=("Arial", 28, "bold"), bg=self.bg_color, fg=self.fg_color)
