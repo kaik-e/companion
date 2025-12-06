@@ -167,6 +167,67 @@ class MacroController:
         else:
             self.update_status("Macro resumed")
     
+    def test_sell_sequence(self):
+        """Test the sell sequence without mining - for debugging"""
+        self.reload_settings()
+        
+        # Validate buttons are set
+        if not all(self.buttons.values()):
+            self.update_status("Error: Configure all buttons first")
+            return False
+        
+        self.update_status("Testing sell sequence...")
+        
+        try:
+            # Focus Roblox
+            self.update_status("Focusing Roblox...")
+            if not focus_roblox():
+                self.update_status("Error: Could not find Roblox!")
+                return False
+            time.sleep(0.5)
+            
+            # Click Inventory
+            self.update_status("Clicking Inventory...")
+            inv_pos = self.buttons["inventory"]
+            print(f"[test] Inventory: {inv_pos}")
+            click_at(inv_pos["x"], inv_pos["y"])
+            time.sleep(0.8)
+            
+            # Click Sell tab
+            self.update_status("Clicking Sell Tab...")
+            sell_tab_pos = self.buttons["sell_tab"]
+            print(f"[test] Sell Tab: {sell_tab_pos}")
+            click_at(sell_tab_pos["x"], sell_tab_pos["y"])
+            time.sleep(0.6)
+            
+            # Click Select All
+            self.update_status("Clicking Select All...")
+            select_pos = self.buttons["select_all"]
+            print(f"[test] Select All: {select_pos}")
+            click_at(select_pos["x"], select_pos["y"])
+            time.sleep(0.5)
+            
+            # Click Accept
+            self.update_status("Clicking Accept...")
+            accept_pos = self.buttons["accept"]
+            print(f"[test] Accept: {accept_pos}")
+            click_at(accept_pos["x"], accept_pos["y"])
+            time.sleep(0.6)
+            
+            # Click X to close menu
+            self.update_status("Clicking Close (X)...")
+            close_pos = self.buttons["close_menu"]
+            print(f"[test] Close: {close_pos}")
+            click_at(close_pos["x"], close_pos["y"])
+            time.sleep(0.3)
+            
+            self.update_status("Test complete!")
+            return True
+            
+        except Exception as e:
+            self.update_status(f"Test error: {e}")
+            return False
+    
     def _macro_loop(self):
         """Main macro loop - runs until stopped with F6 or Escape"""
         hold_minutes = self.settings.get("hold_duration", 5)

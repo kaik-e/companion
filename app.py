@@ -478,15 +478,25 @@ class ForgerCompanion:
                                            bg=self.bg_color, fg=FG_DIM)
         self.macro_detail_label.pack(pady=(0, 30))
         
+        # Buttons row
+        btn_row = tk.Frame(content, bg=self.bg_color)
+        btn_row.pack(pady=10)
+        
         # Big start/stop button
-        self.macro_btn = StyledButton(content, text="▶ Start Macro", command=self.toggle_macro,
-                                      width=160, height=50, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
+        self.macro_btn = StyledButton(btn_row, text="▶ Start", command=self.toggle_macro,
+                                      width=120, height=50, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
                                       font=("Arial", 14), bold=True)
-        self.macro_btn.pack(pady=10)
+        self.macro_btn.pack(side=tk.LEFT, padx=5)
+        
+        # Test sell button
+        self.test_btn = StyledButton(btn_row, text="Test Sell", command=self.test_sell,
+                                     width=100, height=50, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                     font=("Arial", 12))
+        self.test_btn.pack(side=tk.LEFT, padx=5)
         
         # Timer display
         self.timer_label = tk.Label(content, text="", font=("Arial", 24, "bold"), bg=self.bg_color, fg=FG_GOLD)
-        self.timer_label.pack(pady=20)
+        self.timer_label.pack(pady=15)
         
         # Info card
         info_card = tk.Frame(content, bg=BG_CARD, padx=20, pady=15)
@@ -523,10 +533,17 @@ class ForgerCompanion:
                 return
             
             if self.macro_controller.start():
-                self.macro_btn.text = "⏹ Stop Macro"
+                self.macro_btn.text = "⏹ Stop"
                 self.macro_btn.bg_normal = BG_DANGER
                 self.macro_btn.draw_button(BG_DANGER)
                 self.macro_status_indicator.config(fg=FG_GREEN)
+    
+    def test_sell(self):
+        """Test the sell sequence"""
+        import threading
+        def run_test():
+            self.macro_controller.test_sell_sequence()
+        threading.Thread(target=run_test, daemon=True).start()
     
     def on_macro_status(self, status):
         """Called when macro status changes"""
@@ -534,7 +551,7 @@ class ForgerCompanion:
             self.macro_status_label.config(text=status)
             # Update button state if macro stopped
             if "stopped" in status.lower() or not self.macro_controller.running:
-                self.macro_btn.text = "▶ Start Macro"
+                self.macro_btn.text = "▶ Start"
                 self.macro_btn.bg_normal = BG_PRIMARY
                 self.macro_btn.draw_button(BG_PRIMARY)
                 self.macro_status_indicator.config(fg="#666")
