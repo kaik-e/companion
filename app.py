@@ -186,6 +186,10 @@ class ForgerCompanion:
         
         self.setup_ui()
         
+        # Show tutorial on first run
+        if not self.settings.get("setup_complete"):
+            self.root.after(500, self.show_tutorial)
+        
         # Start auto-detection in background
         if self.auto_mode:
             self.start_auto_detect()
@@ -548,6 +552,113 @@ class ForgerCompanion:
         self.ores_region = get_region("ores_panel")
         self.status_label.config(text="Settings updated")
     
+    def show_tutorial(self):
+        """Show first-time tutorial overlay"""
+        # Create overlay frame
+        self.tutorial_frame = tk.Frame(self.root, bg="#0d0d0d")
+        self.tutorial_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        
+        # Content
+        tk.Label(
+            self.tutorial_frame,
+            text="👋 Welcome!",
+            font=("Arial", 20, "bold"),
+            bg="#0d0d0d",
+            fg="#ffffff"
+        ).pack(pady=(80, 10))
+        
+        tk.Label(
+            self.tutorial_frame,
+            text="Quick Setup",
+            font=("Arial", 12),
+            bg="#0d0d0d",
+            fg="#ffdb4a"
+        ).pack(pady=(0, 20))
+        
+        instructions = """1. Open the Forge UI in-game
+
+2. Click 'Set Region' below and drag to select
+   the area with the 4 ore slots
+
+3. The app will auto-detect when you're forging!"""
+        
+        tk.Label(
+            self.tutorial_frame,
+            text=instructions,
+            font=("Arial", 11),
+            bg="#0d0d0d",
+            fg="#ccc",
+            justify=tk.LEFT
+        ).pack(pady=10)
+        
+        # Buttons
+        btn_frame = tk.Frame(self.tutorial_frame, bg="#0d0d0d")
+        btn_frame.pack(pady=30)
+        
+        tk.Button(
+            btn_frame,
+            text="Set Region",
+            command=self.tutorial_set_region,
+            font=("Arial", 11, "bold"),
+            bg="#5a5a2d",
+            fg="#fff",
+            relief=tk.FLAT,
+            padx=20,
+            pady=8,
+            cursor="hand2"
+        ).pack(side=tk.LEFT, padx=10)
+        
+        tk.Button(
+            btn_frame,
+            text="Skip for now",
+            command=self.close_tutorial,
+            font=("Arial", 10),
+            bg="#333",
+            fg="#999",
+            relief=tk.FLAT,
+            padx=15,
+            pady=8,
+            cursor="hand2"
+        ).pack(side=tk.LEFT, padx=10)
+    
+    def tutorial_set_region(self):
+        """Set region from tutorial"""
+        self.tutorial_frame.destroy()
+        
+        def on_region(region):
+            if region:
+                from config import set_region, save_settings, load_settings
+                set_region("forge_slots", region)
+                self.scan_region = region
+                
+                # Mark setup complete
+                settings = load_settings()
+                settings["setup_complete"] = True
+                save_settings(settings)
+                
+                self.status_label.config(text=f"Region saved! Ready to scan.")
+            else:
+                self.status_label.config(text="No region set - use Settings (⚙) later")
+                # Still mark complete so tutorial doesn't show again
+                from config import save_settings, load_settings
+                settings = load_settings()
+                settings["setup_complete"] = True
+                save_settings(settings)
+        
+        RegionSelector(self.root, on_region)
+    
+    def close_tutorial(self):
+        """Close tutorial without setting region"""
+        self.tutorial_frame.destroy()
+        
+        # Mark setup complete
+        from config import save_settings, load_settings
+        settings = load_settings()
+        settings["setup_complete"] = True
+        save_settings(settings)
+        
+        self.status_label.config(text="Use Settings (⚙) to set region later")
+    
     def run(self):
         self.root.mainloop()
 
@@ -842,21 +953,6 @@ def start_app():
     app.run()
 
 
-def start_with_setup():
-    """Check if setup is needed, then start app"""
-    from config import is_setup_complete
-    from setup_wizard import SetupWizard
-    
-    if not is_setup_complete():
-        # Show setup wizard
-        print("First time setup...")
-        wizard = SetupWizard(on_complete=start_app)
-        wizard.run()
-    else:
-        # Setup already done, start app
-        start_app()
-
-
 def main():
     """Main entry point with auth check"""
     print("Starting Forger Companion...")
@@ -866,14 +962,14 @@ def main():
     result = check_license()
     
     if result.get("valid"):
-        # License valid, check setup
+        # License valid, start app directly
         info = get_license_info()
         print(f"License active - {info.get('days_left', '?')} days remaining")
-        start_with_setup()
+        start_app()
     else:
         # Show activation window
         print(f"License check: {result.get('error', 'Not activated')}")
-        auth = AuthWindow(on_success=start_with_setup)
+        auth = AuthWindow(on_success=start_app)
         auth.run()
 
 
