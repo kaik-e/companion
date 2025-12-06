@@ -62,19 +62,30 @@ def scan_for_ores(region=None):
     for item in text_items:
         text_lower = item["text"].lower().strip()
         
-        matched_ore_id = None
-        for pattern, ore_id in ORE_PATTERNS.items():
-            if pattern in text_lower or text_lower in pattern:
-                matched_ore_id = ore_id
-                break
+        # Find the BEST (longest) matching pattern
+        best_match = None
+        best_match_len = 0
         
-        if matched_ore_id:
+        for pattern, ore_id in ORE_PATTERNS.items():
+            if pattern in text_lower:
+                # Prefer longer pattern matches (magmaite > aite)
+                if len(pattern) > best_match_len:
+                    best_match = ore_id
+                    best_match_len = len(pattern)
+            elif text_lower in pattern and len(text_lower) >= 4:
+                # OCR text is substring of pattern (partial read)
+                if len(text_lower) > best_match_len:
+                    best_match = ore_id
+                    best_match_len = len(text_lower)
+        
+        if best_match:
             ore_items.append({
-                "ore_id": matched_ore_id,
+                "ore_id": best_match,
                 "x": item["x"],
                 "y": item["y"],
                 "text": item["text"]
             })
+            print(f"Matched '{item['text']}' -> {best_match} (len={best_match_len})")
     
     # Second pass: find all count patterns (x#)
     count_items = []
