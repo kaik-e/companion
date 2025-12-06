@@ -1312,7 +1312,7 @@ class MacroSettingsWindow:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Macro Settings")
-        self.window.geometry("400x560")
+        self.window.geometry("400x520")
         self.window.resizable(False, False)
         self.window.configure(bg=BG_DARK)
         self.window.transient(parent)
@@ -1323,8 +1323,8 @@ class MacroSettingsWindow:
         # Center
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() - 400) // 2
-        y = (self.window.winfo_screenheight() - 560) // 2
-        self.window.geometry(f"400x560+{x}+{y}")
+        y = (self.window.winfo_screenheight() - 520) // 2
+        self.window.geometry(f"400x520+{x}+{y}")
         
         self.setup_ui()
     
@@ -1346,9 +1346,6 @@ class MacroSettingsWindow:
         
         buttons_card = tk.Frame(content, bg=BG_CARD, padx=15, pady=10)
         buttons_card.pack(fill=tk.X, pady=(0, 15))
-        
-        # Forge button
-        self._create_button_row(buttons_card, "Forge Button", "forge_button")
         
         # Inventory button
         self._create_button_row(buttons_card, "Inventory", "inventory")
@@ -1434,7 +1431,6 @@ class MacroSettingsWindow:
         self.window.withdraw()
         
         instructions = {
-            "forge_button": "Click on the FORGE button",
             "inventory": "Click on the INVENTORY button",
             "sell_tab": "Click on the SELL tab",
             "select_all": "Click on the SELECT ALL button",

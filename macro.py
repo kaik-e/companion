@@ -68,7 +68,6 @@ class MacroController:
         from config import get_macro_button, get_macro_settings
         self.settings = get_macro_settings()
         self.buttons = {
-            "forge": get_macro_button("forge_button"),
             "inventory": get_macro_button("inventory"),
             "sell_tab": get_macro_button("sell_tab"),
             "select_all": get_macro_button("select_all"),
@@ -80,7 +79,6 @@ class MacroController:
         from config import get_macro_button, get_macro_settings
         self.settings = get_macro_settings()
         self.buttons = {
-            "forge": get_macro_button("forge_button"),
             "inventory": get_macro_button("inventory"),
             "sell_tab": get_macro_button("sell_tab"),
             "select_all": get_macro_button("select_all"),
@@ -136,15 +134,10 @@ class MacroController:
                 continue
             
             try:
-                # Step 1: Click and hold on forge button
-                forge_pos = self.buttons["forge"]
-                self.update_status(f"Holding forge for {hold_minutes}min...")
+                # Step 1: Hold M1 to break rocks for the set duration
+                self.update_status(f"Breaking rocks for {hold_minutes}min...")
                 
-                # Move to forge button
-                user32.SetCursorPos(forge_pos["x"], forge_pos["y"])
-                time.sleep(0.2)
-                
-                # Hold click for duration
+                # Press and HOLD left mouse button
                 user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
                 
                 # Wait in small increments so we can check for stop
@@ -153,10 +146,12 @@ class MacroController:
                     time.sleep(1)
                     elapsed += 1
                     
-                    # Update status every 30 seconds
-                    if elapsed % 30 == 0:
+                    # Update status every 10 seconds
+                    if elapsed % 10 == 0:
                         remaining = hold_seconds - elapsed
-                        self.update_status(f"Forging... {remaining//60}:{remaining%60:02d} left")
+                        mins = remaining // 60
+                        secs = remaining % 60
+                        self.update_status(f"Breaking... {mins}:{secs:02d} left")
                 
                 # Release click
                 user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
