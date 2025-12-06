@@ -14,6 +14,16 @@ DEFAULT_SETTINGS = {
         "forge_slots": None,     # The 4 ore slots in the middle
         "forge_button": None,    # FORGE! button area (for detection)
     },
+    "macro_buttons": {
+        "forge_button": None,    # Click position for FORGE! button
+        "select_all": None,      # Click position for Select All button
+        "sell_button": None,     # Click position for Sell button
+    },
+    "macro_settings": {
+        "enabled": False,
+        "hold_duration": 5,      # Minutes to hold M1
+        "auto_sell": True,
+    },
     "preferences": {
         "auto_mode": True,
         "always_on_top": True,
@@ -32,11 +42,15 @@ def load_settings() -> dict:
                 # Merge with defaults (in case new settings added)
                 settings = DEFAULT_SETTINGS.copy()
                 settings.update(saved)
-                # Deep merge regions
+                # Deep merge nested dicts
                 if "regions" in saved:
                     settings["regions"] = {**DEFAULT_SETTINGS["regions"], **saved["regions"]}
                 if "preferences" in saved:
                     settings["preferences"] = {**DEFAULT_SETTINGS["preferences"], **saved["preferences"]}
+                if "macro_buttons" in saved:
+                    settings["macro_buttons"] = {**DEFAULT_SETTINGS["macro_buttons"], **saved["macro_buttons"]}
+                if "macro_settings" in saved:
+                    settings["macro_settings"] = {**DEFAULT_SETTINGS["macro_settings"], **saved["macro_settings"]}
                 return settings
     except Exception as e:
         print(f"[config] Load error: {e}")
@@ -88,3 +102,42 @@ def reset_setup():
     settings["setup_complete"] = False
     settings["regions"] = DEFAULT_SETTINGS["regions"].copy()
     save_settings(settings)
+
+
+def get_macro_button(name: str) -> dict | None:
+    """Get a macro button position by name"""
+    settings = load_settings()
+    return settings.get("macro_buttons", {}).get(name)
+
+
+def set_macro_button(name: str, position: dict):
+    """Set a macro button position (x, y coordinates)"""
+    settings = load_settings()
+    if "macro_buttons" not in settings:
+        settings["macro_buttons"] = {}
+    settings["macro_buttons"][name] = position
+    save_settings(settings)
+
+
+def get_macro_settings() -> dict:
+    """Get macro settings"""
+    settings = load_settings()
+    return settings.get("macro_settings", DEFAULT_SETTINGS["macro_settings"])
+
+
+def set_macro_settings(macro_settings: dict):
+    """Update macro settings"""
+    settings = load_settings()
+    settings["macro_settings"] = macro_settings
+    save_settings(settings)
+
+
+def is_macro_setup_complete() -> bool:
+    """Check if all macro buttons are configured"""
+    settings = load_settings()
+    buttons = settings.get("macro_buttons", {})
+    return all([
+        buttons.get("forge_button"),
+        buttons.get("select_all"),
+        buttons.get("sell_button")
+    ])

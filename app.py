@@ -908,7 +908,7 @@ class SettingsWindow:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Settings")
-        self.window.geometry("380x320")
+        self.window.geometry("380x420")
         self.window.resizable(False, False)
         self.window.configure(bg=BG_DARK)
         self.window.transient(parent)
@@ -920,8 +920,8 @@ class SettingsWindow:
         # Center on screen
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() - 380) // 2
-        y = (self.window.winfo_screenheight() - 320) // 2
-        self.window.geometry(f"380x320+{x}+{y}")
+        y = (self.window.winfo_screenheight() - 420) // 2
+        self.window.geometry(f"380x420+{x}+{y}")
         
         self.setup_ui()
     
@@ -971,9 +971,21 @@ class SettingsWindow:
         self.top_cb = StyledCheckbox(prefs_card, text="Always on top", variable=self.topmost_var)
         self.top_cb.pack(anchor=tk.W, pady=4)
         
+        # Macro section
+        tk.Label(content, text="Macro", font=("Arial", 11, "bold"), bg=BG_DARK, fg=FG_GOLD).pack(anchor=tk.W, pady=(15, 12))
+        
+        macro_card = tk.Frame(content, bg=BG_CARD, padx=15, pady=12)
+        macro_card.pack(fill=tk.X)
+        
+        tk.Label(macro_card, text="Auto-forge & sell macro", font=("Arial", 10), bg=BG_CARD, fg=FG_DIM).pack(side=tk.LEFT)
+        
+        StyledButton(macro_card, text="Configure", command=self.open_macro_settings,
+                    width=80, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 9)).pack(side=tk.RIGHT)
+        
         # Buttons at bottom
         btn_frame = tk.Frame(self.window, bg=BG_DARK)
-        btn_frame.pack(fill=tk.X, padx=30, pady=20)
+        btn_frame.pack(fill=tk.X, padx=30, pady=15)
         
         StyledButton(btn_frame, text="Cancel", command=self.window.destroy,
                     width=90, height=34, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
@@ -998,6 +1010,10 @@ class SettingsWindow:
                 self.slots_label.config(text=text, fg="#4ade80")
         
         RegionSelector(self.parent, on_selected)
+    
+    def open_macro_settings(self):
+        """Open macro configuration window"""
+        MacroSettingsWindow(self.window)
     
     def save(self):
         """Save settings and close"""
@@ -1081,6 +1097,220 @@ class RegionSelector:
     
     def on_cancel(self, event):
         self.callback(None)
+        self.window.destroy()
+
+
+class PointPicker:
+    """Fullscreen overlay for picking a single point (button position)"""
+    
+    def __init__(self, parent, callback, instruction="Click on the button"):
+        self.callback = callback
+        
+        self.window = tk.Toplevel(parent)
+        self.window.attributes("-fullscreen", True)
+        self.window.attributes("-alpha", 0.4)
+        self.window.attributes("-topmost", True)
+        self.window.configure(bg="black")
+        
+        # Instruction label
+        self.label = tk.Label(
+            self.window,
+            text=instruction + "\n\nPress ESC to cancel",
+            font=("Arial", 18, "bold"),
+            bg="black",
+            fg="white"
+        )
+        self.label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
+        
+        # Crosshair canvas
+        self.canvas = tk.Canvas(self.window, highlightthickness=0, bg="black")
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        
+        self.window.bind("<Button-1>", self.on_click)
+        self.window.bind("<Escape>", self.on_cancel)
+        self.window.bind("<Motion>", self.on_motion)
+        
+        self.crosshair_h = None
+        self.crosshair_v = None
+    
+    def on_motion(self, event):
+        # Draw crosshair
+        if self.crosshair_h:
+            self.canvas.delete(self.crosshair_h)
+            self.canvas.delete(self.crosshair_v)
+        
+        self.crosshair_h = self.canvas.create_line(0, event.y, self.window.winfo_width(), event.y, fill="#7aa2f7", width=1)
+        self.crosshair_v = self.canvas.create_line(event.x, 0, event.x, self.window.winfo_height(), fill="#7aa2f7", width=1)
+    
+    def on_click(self, event):
+        position = {"x": event.x, "y": event.y}
+        self.callback(position)
+        self.window.destroy()
+    
+    def on_cancel(self, event):
+        self.callback(None)
+        self.window.destroy()
+
+
+class MacroSettingsWindow:
+    """Macro configuration window"""
+    
+    def __init__(self, parent):
+        self.parent = parent
+        
+        self.window = tk.Toplevel(parent)
+        self.window.title("Macro Settings")
+        self.window.geometry("400x480")
+        self.window.resizable(False, False)
+        self.window.configure(bg=BG_DARK)
+        self.window.transient(parent)
+        self.window.grab_set()
+        
+        set_dark_titlebar(self.window)
+        
+        # Center
+        self.window.update_idletasks()
+        x = (self.window.winfo_screenwidth() - 400) // 2
+        y = (self.window.winfo_screenheight() - 480) // 2
+        self.window.geometry(f"400x480+{x}+{y}")
+        
+        self.setup_ui()
+    
+    def setup_ui(self):
+        from config import get_macro_button, get_macro_settings
+        self.macro_settings = get_macro_settings()
+        
+        # Title
+        tk.Label(self.window, text="Macro Settings", font=("Arial", 18, "bold"), bg=BG_DARK, fg=FG_WHITE).pack(pady=(20, 15))
+        
+        # Content
+        content = tk.Frame(self.window, bg=BG_DARK)
+        content.pack(fill=tk.BOTH, expand=True, padx=25)
+        
+        # Button positions section
+        tk.Label(content, text="Button Positions", font=("Arial", 11, "bold"), bg=BG_DARK, fg=FG_GOLD).pack(anchor=tk.W, pady=(0, 10))
+        
+        tk.Label(content, text="Click 'Set' then click on the button in-game", font=("Arial", 9), bg=BG_DARK, fg=FG_DIM).pack(anchor=tk.W, pady=(0, 10))
+        
+        buttons_card = tk.Frame(content, bg=BG_CARD, padx=15, pady=10)
+        buttons_card.pack(fill=tk.X, pady=(0, 15))
+        
+        # Forge button
+        self.forge_label = self._create_button_row(buttons_card, "Forge Button", "forge_button")
+        
+        # Select All button
+        self.select_label = self._create_button_row(buttons_card, "Select All", "select_all")
+        
+        # Sell button
+        self.sell_label = self._create_button_row(buttons_card, "Sell Button", "sell_button")
+        
+        # Duration section
+        tk.Label(content, text="Settings", font=("Arial", 11, "bold"), bg=BG_DARK, fg=FG_GOLD).pack(anchor=tk.W, pady=(10, 10))
+        
+        settings_card = tk.Frame(content, bg=BG_CARD, padx=15, pady=12)
+        settings_card.pack(fill=tk.X)
+        
+        # Duration row
+        dur_frame = tk.Frame(settings_card, bg=BG_CARD)
+        dur_frame.pack(fill=tk.X, pady=5)
+        
+        tk.Label(dur_frame, text="Hold duration (minutes)", font=("Arial", 10), bg=BG_CARD, fg=FG_WHITE).pack(side=tk.LEFT)
+        
+        self.duration_var = tk.IntVar(value=self.macro_settings.get("hold_duration", 5))
+        
+        dur_controls = tk.Frame(dur_frame, bg=BG_CARD)
+        dur_controls.pack(side=tk.RIGHT)
+        
+        StyledButton(dur_controls, text="−", command=self.dec_duration,
+                    width=26, height=24, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 10), bold=True).pack(side=tk.LEFT, padx=2)
+        
+        self.dur_label = tk.Label(dur_controls, text=str(self.duration_var.get()), font=("Arial", 11, "bold"), 
+                                  bg=BG_CARD, fg=FG_GOLD, width=3)
+        self.dur_label.pack(side=tk.LEFT, padx=5)
+        
+        StyledButton(dur_controls, text="+", command=self.inc_duration,
+                    width=26, height=24, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 10), bold=True).pack(side=tk.LEFT, padx=2)
+        
+        # Auto-sell checkbox
+        self.autosell_var = tk.BooleanVar(value=self.macro_settings.get("auto_sell", True))
+        self.autosell_cb = StyledCheckbox(settings_card, text="Auto-sell after forging", variable=self.autosell_var)
+        self.autosell_cb.pack(anchor=tk.W, pady=8)
+        
+        # Buttons
+        btn_frame = tk.Frame(self.window, bg=BG_DARK)
+        btn_frame.pack(fill=tk.X, padx=25, pady=20)
+        
+        StyledButton(btn_frame, text="Close", command=self.window.destroy,
+                    width=90, height=34, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 10)).pack(side=tk.LEFT)
+        
+        StyledButton(btn_frame, text="Save", command=self.save,
+                    width=90, height=34, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
+                    font=("Arial", 10), bold=True).pack(side=tk.RIGHT)
+    
+    def _create_button_row(self, parent, label, button_name):
+        from config import get_macro_button
+        
+        frame = tk.Frame(parent, bg=BG_CARD)
+        frame.pack(fill=tk.X, pady=4)
+        
+        tk.Label(frame, text=label, font=("Arial", 10), bg=BG_CARD, fg=FG_WHITE).pack(side=tk.LEFT)
+        
+        pos = get_macro_button(button_name)
+        pos_text = f"({pos['x']}, {pos['y']})" if pos else "Not set"
+        pos_color = FG_GREEN if pos else FG_DIM
+        
+        pos_label = tk.Label(frame, text=pos_text, font=("Arial", 9), bg=BG_CARD, fg=pos_color)
+        pos_label.pack(side=tk.LEFT, padx=15)
+        
+        StyledButton(frame, text="Set", command=lambda: self.pick_button(button_name, pos_label),
+                    width=50, height=24, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 9)).pack(side=tk.RIGHT)
+        
+        return pos_label
+    
+    def pick_button(self, button_name, label):
+        """Open point picker for a button"""
+        self.window.withdraw()
+        
+        instructions = {
+            "forge_button": "Click on the FORGE button",
+            "select_all": "Click on the SELECT ALL button",
+            "sell_button": "Click on the SELL button"
+        }
+        
+        def on_picked(position):
+            self.window.deiconify()
+            if position:
+                from config import set_macro_button
+                set_macro_button(button_name, position)
+                label.config(text=f"({position['x']}, {position['y']})", fg=FG_GREEN)
+        
+        PointPicker(self.parent, on_picked, instructions.get(button_name, "Click on the button"))
+    
+    def inc_duration(self):
+        val = self.duration_var.get()
+        if val < 15:
+            self.duration_var.set(val + 1)
+            self.dur_label.config(text=str(val + 1))
+    
+    def dec_duration(self):
+        val = self.duration_var.get()
+        if val > 1:
+            self.duration_var.set(val - 1)
+            self.dur_label.config(text=str(val - 1))
+    
+    def save(self):
+        from config import set_macro_settings
+        
+        settings = {
+            "enabled": True,
+            "hold_duration": self.duration_var.get(),
+            "auto_sell": self.autosell_var.get()
+        }
+        set_macro_settings(settings)
         self.window.destroy()
 
 
