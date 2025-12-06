@@ -236,10 +236,13 @@ class ForgerCompanion:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Forger Companion")
-        self.root.geometry("400x520")
+        self.root.geometry("420x550")
         self.root.attributes("-topmost", True)
         self.root.attributes("-alpha", 0.95)
-        self.root.resizable(True, True)
+        self.root.resizable(False, False)
+        
+        # Remove default title bar
+        self.root.overrideredirect(True)
         
         # Dark theme
         self.bg_color = BG_DARK
@@ -250,8 +253,9 @@ class ForgerCompanion:
         
         self.root.configure(bg=self.bg_color)
         
-        # Dark title bar
-        set_dark_titlebar(self.root)
+        # UI state
+        self.minimized = False
+        self.drag_data = {"x": 0, "y": 0}
         
         # Load saved settings
         from config import load_settings, get_region
@@ -261,14 +265,20 @@ class ForgerCompanion:
         self.scanning = False
         self.auto_mode = self.settings.get("preferences", {}).get("auto_mode", True)
         self.forge_ui_visible = False
-        self.scan_region = get_region("forge_slots")  # Use saved region
-        self.ores_region = get_region("ores_panel")   # For ore inventory
+        self.scan_region = get_region("forge_slots")
+        self.ores_region = get_region("ores_panel")
         self.detected_ores = {}
         self.craft_type = "Weapon"
         self.enhancement_level = 0
         self.last_result = None
         
         self.setup_ui()
+        
+        # Center window on screen
+        self.root.update_idletasks()
+        x = (self.root.winfo_screenwidth() - 420) // 2
+        y = (self.root.winfo_screenheight() - 550) // 2
+        self.root.geometry(f"+{x}+{y}")
         
         # Show tutorial on first run
         if not self.settings.get("setup_complete"):
@@ -277,58 +287,99 @@ class ForgerCompanion:
         # Start auto-detection in background
         if self.auto_mode:
             self.start_auto_detect()
-        
+    
     def setup_ui(self):
-        # Controls bar at top
-        controls = tk.Frame(self.root, bg=BG_CARD, height=50)
+        # === CUSTOM TITLE BAR ===
+        self.title_bar = tk.Frame(self.root, bg="#151515", height=36)
+        self.title_bar.pack(fill=tk.X)
+        self.title_bar.pack_propagate(False)
+        
+        # Make title bar draggable
+        self.title_bar.bind("<Button-1>", self.start_drag)
+        self.title_bar.bind("<B1-Motion>", self.do_drag)
+        
+        # App icon and title
+        title_left = tk.Frame(self.title_bar, bg="#151515")
+        title_left.pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        
+        tk.Label(title_left, text="⚒", font=("Arial", 14), bg="#151515", fg=FG_GOLD).pack(side=tk.LEFT, pady=8)
+        title_lbl = tk.Label(title_left, text="Forger Companion", font=("Arial", 10, "bold"), bg="#151515", fg=FG_WHITE)
+        title_lbl.pack(side=tk.LEFT, padx=8, pady=8)
+        title_lbl.bind("<Button-1>", self.start_drag)
+        title_lbl.bind("<B1-Motion>", self.do_drag)
+        
+        # Window controls (right side)
+        title_right = tk.Frame(self.title_bar, bg="#151515")
+        title_right.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Minimize/collapse button
+        self.collapse_btn = tk.Label(title_right, text="▼", font=("Arial", 10), bg="#151515", fg=FG_DIM, 
+                                     width=4, cursor="hand2")
+        self.collapse_btn.pack(side=tk.LEFT, fill=tk.Y)
+        self.collapse_btn.bind("<Button-1>", lambda e: self.toggle_collapse())
+        self.collapse_btn.bind("<Enter>", lambda e: self.collapse_btn.config(bg="#252525"))
+        self.collapse_btn.bind("<Leave>", lambda e: self.collapse_btn.config(bg="#151515"))
+        
+        # Close button
+        close_btn = tk.Label(title_right, text="✕", font=("Arial", 11), bg="#151515", fg=FG_DIM, 
+                            width=4, cursor="hand2")
+        close_btn.pack(side=tk.LEFT, fill=tk.Y)
+        close_btn.bind("<Button-1>", lambda e: self.root.destroy())
+        close_btn.bind("<Enter>", lambda e: close_btn.config(bg="#c42b1c", fg=FG_WHITE))
+        close_btn.bind("<Leave>", lambda e: close_btn.config(bg="#151515", fg=FG_DIM))
+        
+        # === MAIN CONTENT (collapsible) ===
+        self.main_content = tk.Frame(self.root, bg=self.bg_color)
+        self.main_content.pack(fill=tk.BOTH, expand=True)
+        
+        # Controls bar
+        controls = tk.Frame(self.main_content, bg=BG_CARD, height=44)
         controls.pack(fill=tk.X, padx=8, pady=(8, 4))
         controls.pack_propagate(False)
         
         # Left side controls
         left_controls = tk.Frame(controls, bg=BG_CARD)
-        left_controls.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=8)
+        left_controls.pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=7)
         
         # Auto mode indicator + button
-        self.auto_indicator = tk.Label(left_controls, text="●", font=("Arial", 14), bg=BG_CARD, fg="#666")
-        self.auto_indicator.pack(side=tk.LEFT, padx=(0, 3))
+        self.auto_indicator = tk.Label(left_controls, text="●", font=("Arial", 12), bg=BG_CARD, fg="#666")
+        self.auto_indicator.pack(side=tk.LEFT, padx=(0, 4))
         
         self.auto_btn = StyledButton(left_controls, text="Auto", command=self.toggle_auto_mode,
-                                     width=55, height=30, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
+                                     width=50, height=28, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
                                      font=("Arial", 9), bold=True)
-        self.auto_btn.pack(side=tk.LEFT, padx=3)
+        self.auto_btn.pack(side=tk.LEFT, padx=2)
         
         self.scan_btn = StyledButton(left_controls, text="▶ Scan", command=self.toggle_scan,
-                                     width=65, height=30, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                     width=60, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
                                      font=("Arial", 9))
-        self.scan_btn.pack(side=tk.LEFT, padx=3)
+        self.scan_btn.pack(side=tk.LEFT, padx=2)
         
         # Settings button
         self.settings_btn = StyledButton(left_controls, text="⚙", command=self.open_settings,
-                                         width=35, height=30, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
-                                         font=("Arial", 11))
-        self.settings_btn.pack(side=tk.LEFT, padx=3)
+                                         width=30, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                         font=("Arial", 10))
+        self.settings_btn.pack(side=tk.LEFT, padx=2)
         
         # Right side - Enhancement controls
         right_controls = tk.Frame(controls, bg=BG_CARD)
-        right_controls.pack(side=tk.RIGHT, fill=tk.Y, padx=5, pady=8)
-        
-        tk.Label(right_controls, text="Enhancement", font=("Arial", 8), bg=BG_CARD, fg=FG_DIM).pack(side=tk.LEFT, padx=(0, 8))
+        right_controls.pack(side=tk.RIGHT, fill=tk.Y, padx=8, pady=7)
         
         self.enh_minus_btn = StyledButton(right_controls, text="−", command=self.decrease_enhancement,
-                                          width=28, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
-                                          font=("Arial", 12), bold=True)
+                                          width=26, height=26, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                          font=("Arial", 11), bold=True)
         self.enh_minus_btn.pack(side=tk.LEFT, padx=2)
         
-        self.enh_label = tk.Label(right_controls, text="+0", font=("Arial", 12, "bold"), bg=BG_CARD, fg=FG_GOLD, width=3)
+        self.enh_label = tk.Label(right_controls, text="+0", font=("Arial", 11, "bold"), bg=BG_CARD, fg=FG_GOLD, width=3)
         self.enh_label.pack(side=tk.LEFT, padx=2)
         
         self.enh_plus_btn = StyledButton(right_controls, text="+", command=self.increase_enhancement,
-                                         width=28, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
-                                         font=("Arial", 12), bold=True)
+                                         width=26, height=26, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                         font=("Arial", 11), bold=True)
         self.enh_plus_btn.pack(side=tk.LEFT, padx=2)
         
         # Main content area
-        self.content = tk.Frame(self.root, bg=self.bg_color)
+        self.content = tk.Frame(self.main_content, bg=self.bg_color)
         self.content.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         # === MULTI LABEL ===
@@ -394,18 +445,18 @@ class ForgerCompanion:
         self.armor_traits_label.pack(pady=2)
         
         # Status bar at bottom
-        status_frame = tk.Frame(self.root, bg="#1a1a1a")
-        status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
+        status_frame = tk.Frame(self.main_content, bg=BG_CARD)
+        status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=8, pady=8)
         
-        self.status_label = tk.Label(status_frame, text="Waiting for Forge UI...", font=("Arial", 8), bg="#1a1a1a", fg="#666", anchor=tk.W)
-        self.status_label.pack(side=tk.LEFT)
+        self.status_label = tk.Label(status_frame, text="Waiting for Forge UI...", font=("Arial", 9), bg=BG_CARD, fg=FG_DIM, anchor=tk.W)
+        self.status_label.pack(side=tk.LEFT, padx=10, pady=6)
         
         # License info
         info = get_license_info()
         if info.get("active"):
             days = info.get("days_left", 0)
-            color = "#4ade80" if days > 7 else "#ffdb4a" if days > 1 else "#ff4444"
-            tk.Label(status_frame, text=f"License: {days}d", font=("Arial", 8), bg="#1a1a1a", fg=color).pack(side=tk.RIGHT)
+            color = FG_GREEN if days > 7 else FG_GOLD if days > 1 else FG_RED
+            tk.Label(status_frame, text=f"License: {days}d", font=("Arial", 9), bg=BG_CARD, fg=color).pack(side=tk.RIGHT, padx=10, pady=6)
         
         # Debug (hidden by default)
         self.debug_frame = tk.Frame(self.root, bg=self.bg_color)
