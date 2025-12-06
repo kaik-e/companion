@@ -10,6 +10,77 @@ import sys
 from auth import check_license, validate_key, get_license_info
 
 
+# ============ UI STYLING ============
+
+# Colors
+BG_DARK = "#0d0d0d"
+BG_CARD = "#1a1a1a"
+BG_BUTTON = "#2a2a2a"
+BG_BUTTON_HOVER = "#3a3a3a"
+BG_PRIMARY = "#3d6b3d"
+BG_PRIMARY_HOVER = "#4a7f4a"
+BG_ACCENT = "#5a5a2d"
+BG_DANGER = "#5a2d2d"
+FG_WHITE = "#ffffff"
+FG_DIM = "#9a9a9a"
+FG_GOLD = "#ffdb4a"
+FG_GREEN = "#4ade80"
+FG_RED = "#ff6b6b"
+
+
+class StyledButton(tk.Canvas):
+    """Custom styled button with hover effects"""
+    
+    def __init__(self, parent, text, command=None, width=100, height=32, 
+                 bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER, fg=FG_WHITE, 
+                 font=("Arial", 10), bold=False, **kwargs):
+        super().__init__(parent, width=width, height=height, 
+                        bg=parent.cget("bg"), highlightthickness=0, **kwargs)
+        
+        self.command = command
+        self.bg_normal = bg
+        self.bg_hover = bg_hover
+        self.fg = fg
+        self.text = text
+        self.font = (font[0], font[1], "bold") if bold else font
+        self.width = width
+        self.height = height
+        
+        self.draw_button(self.bg_normal)
+        
+        self.bind("<Enter>", self.on_enter)
+        self.bind("<Leave>", self.on_leave)
+        self.bind("<Button-1>", self.on_click)
+    
+    def draw_button(self, bg_color):
+        self.delete("all")
+        # Rounded rectangle
+        r = 6  # corner radius
+        self.create_rounded_rect(2, 2, self.width-2, self.height-2, r, fill=bg_color, outline="")
+        # Text
+        self.create_text(self.width//2, self.height//2, text=self.text, 
+                        fill=self.fg, font=self.font)
+    
+    def create_rounded_rect(self, x1, y1, x2, y2, r, **kwargs):
+        points = [
+            x1+r, y1, x2-r, y1, x2, y1, x2, y1+r,
+            x2, y2-r, x2, y2, x2-r, y2, x1+r, y2,
+            x1, y2, x1, y2-r, x1, y1+r, x1, y1
+        ]
+        return self.create_polygon(points, smooth=True, **kwargs)
+    
+    def on_enter(self, e):
+        self.draw_button(self.bg_hover)
+        self.config(cursor="hand2")
+    
+    def on_leave(self, e):
+        self.draw_button(self.bg_normal)
+    
+    def on_click(self, e):
+        if self.command:
+            self.command()
+
+
 class AuthWindow:
     """License activation window"""
     
@@ -18,95 +89,70 @@ class AuthWindow:
         self.activated = False
         
         self.root = tk.Tk()
-        self.root.title("Forger Companion - Activation")
-        self.root.geometry("400x280")
+        self.root.title("Forger Companion")
+        self.root.geometry("420x320")
         self.root.resizable(False, False)
-        self.root.configure(bg="#0d0d0d")
+        self.root.configure(bg=BG_DARK)
         
         # Center window
         self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() - 400) // 2
-        y = (self.root.winfo_screenheight() - 280) // 2
-        self.root.geometry(f"400x280+{x}+{y}")
+        x = (self.root.winfo_screenwidth() - 420) // 2
+        y = (self.root.winfo_screenheight() - 320) // 2
+        self.root.geometry(f"420x320+{x}+{y}")
+        
+        # Main container
+        container = tk.Frame(self.root, bg=BG_DARK)
+        container.pack(expand=True, fill=tk.BOTH, padx=40, pady=30)
         
         # Logo/Title
-        tk.Label(
-            self.root,
-            text="⚒ Forger Companion",
-            font=("Arial", 18, "bold"),
-            bg="#0d0d0d",
-            fg="#ffffff"
-        ).pack(pady=(30, 5))
+        tk.Label(container, text="⚒", font=("Arial", 36), bg=BG_DARK, fg=FG_GOLD).pack(pady=(0, 5))
+        tk.Label(container, text="Forger Companion", font=("Arial", 20, "bold"), bg=BG_DARK, fg=FG_WHITE).pack(pady=(0, 5))
+        tk.Label(container, text="Enter your license key", font=("Arial", 11), bg=BG_DARK, fg=FG_DIM).pack(pady=(0, 25))
         
-        tk.Label(
-            self.root,
-            text="Enter your license key to activate",
-            font=("Arial", 10),
-            bg="#0d0d0d",
-            fg="#9a9a9a"
-        ).pack(pady=(0, 20))
+        # Key entry with border frame
+        entry_frame = tk.Frame(container, bg="#333", padx=2, pady=2)
+        entry_frame.pack(fill=tk.X, pady=(0, 5))
         
-        # Key entry
         self.key_var = tk.StringVar()
         self.key_entry = tk.Entry(
-            self.root,
+            entry_frame,
             textvariable=self.key_var,
-            font=("Consolas", 14),
-            width=20,
+            font=("Consolas", 16),
             justify="center",
-            bg="#1a1a1a",
-            fg="#ffffff",
-            insertbackground="#ffffff",
+            bg=BG_CARD,
+            fg=FG_WHITE,
+            insertbackground=FG_WHITE,
             relief=tk.FLAT,
-            highlightthickness=1,
-            highlightbackground="#333",
-            highlightcolor="#ffdb4a"
+            bd=0
         )
-        self.key_entry.pack(pady=10, ipady=8)
+        self.key_entry.pack(fill=tk.X, ipady=12)
         self.key_entry.focus()
         
         # Placeholder
         self.key_entry.insert(0, "FORGER-XXXXXX")
+        self.key_entry.config(fg=FG_DIM)
         self.key_entry.bind("<FocusIn>", self.clear_placeholder)
         self.key_entry.bind("<Return>", lambda e: self.activate())
         
-        # Activate button
-        self.activate_btn = tk.Button(
-            self.root,
-            text="Activate",
-            command=self.activate,
-            font=("Arial", 11, "bold"),
-            bg="#2d5a2d",
-            fg="#ffffff",
-            relief=tk.FLAT,
-            padx=30,
-            pady=8,
-            cursor="hand2"
-        )
-        self.activate_btn.pack(pady=15)
-        
         # Status label
-        self.status_label = tk.Label(
-            self.root,
-            text="",
-            font=("Arial", 9),
-            bg="#0d0d0d",
-            fg="#ff4444"
+        self.status_label = tk.Label(container, text="", font=("Arial", 10), bg=BG_DARK, fg=FG_RED, height=2)
+        self.status_label.pack(pady=(10, 10))
+        
+        # Activate button
+        self.activate_btn = StyledButton(
+            container, text="Activate", command=self.activate,
+            width=160, height=40, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
+            font=("Arial", 12), bold=True
         )
-        self.status_label.pack(pady=5)
+        self.activate_btn.pack(pady=(0, 15))
         
         # Footer
-        tk.Label(
-            self.root,
-            text="Get a key from the Forger Discord bot",
-            font=("Arial", 8),
-            bg="#0d0d0d",
-            fg="#666"
-        ).pack(side=tk.BOTTOM, pady=10)
+        tk.Label(container, text="Get a key from the Forger Discord bot", font=("Arial", 9), bg=BG_DARK, fg="#555").pack(side=tk.BOTTOM)
     
     def clear_placeholder(self, event):
         if self.key_var.get() == "FORGER-XXXXXX":
             self.key_entry.delete(0, tk.END)
+            self.key_entry.config(fg=FG_WHITE)
     
     def activate(self):
         key = self.key_var.get().strip().upper()
@@ -196,28 +242,52 @@ class ForgerCompanion:
         
     def setup_ui(self):
         # Controls bar at top
-        controls = tk.Frame(self.root, bg="#1a1a1a")
-        controls.pack(fill=tk.X, padx=10, pady=8)
+        controls = tk.Frame(self.root, bg=BG_CARD, height=50)
+        controls.pack(fill=tk.X, padx=8, pady=(8, 4))
+        controls.pack_propagate(False)
         
-        # Auto mode indicator
-        self.auto_indicator = tk.Label(controls, text="●", font=("Arial", 12), bg="#1a1a1a", fg="#666")
-        self.auto_indicator.pack(side=tk.LEFT, padx=(0, 5))
+        # Left side controls
+        left_controls = tk.Frame(controls, bg=BG_CARD)
+        left_controls.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=8)
         
-        self.auto_btn = tk.Button(controls, text="Auto", command=self.toggle_auto_mode, bg="#2d5a2d", fg="white", font=("Arial", 9, "bold"), relief=tk.FLAT, padx=8, pady=2)
-        self.auto_btn.pack(side=tk.LEFT, padx=2)
+        # Auto mode indicator + button
+        self.auto_indicator = tk.Label(left_controls, text="●", font=("Arial", 14), bg=BG_CARD, fg="#666")
+        self.auto_indicator.pack(side=tk.LEFT, padx=(0, 3))
         
-        self.scan_btn = tk.Button(controls, text="▶ Scan", command=self.toggle_scan, bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=12, pady=2)
-        self.scan_btn.pack(side=tk.LEFT, padx=2)
+        self.auto_btn = StyledButton(left_controls, text="Auto", command=self.toggle_auto_mode,
+                                     width=55, height=30, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
+                                     font=("Arial", 9), bold=True)
+        self.auto_btn.pack(side=tk.LEFT, padx=3)
         
-        # Settings button (gear icon)
-        tk.Button(controls, text="⚙", command=self.open_settings, bg="#333", fg="#ccc", font=("Arial", 10), relief=tk.FLAT, width=3, pady=2).pack(side=tk.LEFT, padx=2)
+        self.scan_btn = StyledButton(left_controls, text="▶ Scan", command=self.toggle_scan,
+                                     width=65, height=30, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                     font=("Arial", 9))
+        self.scan_btn.pack(side=tk.LEFT, padx=3)
         
-        # Enhancement controls
-        tk.Button(controls, text="-", command=self.decrease_enhancement, bg="#333", fg="#ccc", font=("Arial", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.RIGHT, padx=1)
-        self.enh_label = tk.Label(controls, text="+0", font=("Arial", 10, "bold"), bg="#1a1a1a", fg="#ff9e64", width=3)
-        self.enh_label.pack(side=tk.RIGHT)
-        tk.Button(controls, text="+", command=self.increase_enhancement, bg="#333", fg="#ccc", font=("Arial", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.RIGHT, padx=1)
-        tk.Label(controls, text="Enh:", font=("Arial", 8), bg="#1a1a1a", fg="#666").pack(side=tk.RIGHT, padx=4)
+        # Settings button
+        self.settings_btn = StyledButton(left_controls, text="⚙", command=self.open_settings,
+                                         width=35, height=30, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                         font=("Arial", 11))
+        self.settings_btn.pack(side=tk.LEFT, padx=3)
+        
+        # Right side - Enhancement controls
+        right_controls = tk.Frame(controls, bg=BG_CARD)
+        right_controls.pack(side=tk.RIGHT, fill=tk.Y, padx=5, pady=8)
+        
+        tk.Label(right_controls, text="Enhancement", font=("Arial", 8), bg=BG_CARD, fg=FG_DIM).pack(side=tk.LEFT, padx=(0, 8))
+        
+        self.enh_minus_btn = StyledButton(right_controls, text="−", command=self.decrease_enhancement,
+                                          width=28, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                          font=("Arial", 12), bold=True)
+        self.enh_minus_btn.pack(side=tk.LEFT, padx=2)
+        
+        self.enh_label = tk.Label(right_controls, text="+0", font=("Arial", 12, "bold"), bg=BG_CARD, fg=FG_GOLD, width=3)
+        self.enh_label.pack(side=tk.LEFT, padx=2)
+        
+        self.enh_plus_btn = StyledButton(right_controls, text="+", command=self.increase_enhancement,
+                                         width=28, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                                         font=("Arial", 12), bold=True)
+        self.enh_plus_btn.pack(side=tk.LEFT, padx=2)
         
         # Main content area
         self.content = tk.Frame(self.root, bg=self.bg_color)
@@ -555,71 +625,44 @@ class ForgerCompanion:
     def show_tutorial(self):
         """Show first-time tutorial overlay"""
         # Create overlay frame
-        self.tutorial_frame = tk.Frame(self.root, bg="#0d0d0d")
+        self.tutorial_frame = tk.Frame(self.root, bg=BG_DARK)
         self.tutorial_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
         
-        # Content
-        tk.Label(
-            self.tutorial_frame,
-            text="👋 Welcome!",
-            font=("Arial", 20, "bold"),
-            bg="#0d0d0d",
-            fg="#ffffff"
-        ).pack(pady=(80, 10))
+        # Content container
+        content = tk.Frame(self.tutorial_frame, bg=BG_DARK)
+        content.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         
-        tk.Label(
-            self.tutorial_frame,
-            text="Quick Setup",
-            font=("Arial", 12),
-            bg="#0d0d0d",
-            fg="#ffdb4a"
-        ).pack(pady=(0, 20))
+        tk.Label(content, text="👋", font=("Arial", 40), bg=BG_DARK, fg=FG_WHITE).pack(pady=(0, 10))
+        tk.Label(content, text="Welcome!", font=("Arial", 22, "bold"), bg=BG_DARK, fg=FG_WHITE).pack(pady=(0, 5))
+        tk.Label(content, text="Quick Setup", font=("Arial", 11), bg=BG_DARK, fg=FG_GOLD).pack(pady=(0, 25))
         
-        instructions = """1. Open the Forge UI in-game
-
-2. Click 'Set Region' below and drag to select
-   the area with the 4 ore slots
-
-3. The app will auto-detect when you're forging!"""
+        # Instructions in a card
+        card = tk.Frame(content, bg=BG_CARD, padx=25, pady=20)
+        card.pack(pady=(0, 25))
         
-        tk.Label(
-            self.tutorial_frame,
-            text=instructions,
-            font=("Arial", 11),
-            bg="#0d0d0d",
-            fg="#ccc",
-            justify=tk.LEFT
-        ).pack(pady=10)
+        steps = [
+            ("1.", "Open the Forge UI in-game"),
+            ("2.", "Click 'Set Region' and select the ore slots area"),
+            ("3.", "The app will auto-detect when you're forging!")
+        ]
+        
+        for num, text in steps:
+            step_frame = tk.Frame(card, bg=BG_CARD)
+            step_frame.pack(fill=tk.X, pady=6)
+            tk.Label(step_frame, text=num, font=("Arial", 11, "bold"), bg=BG_CARD, fg=FG_GOLD, width=2).pack(side=tk.LEFT)
+            tk.Label(step_frame, text=text, font=("Arial", 11), bg=BG_CARD, fg=FG_WHITE, anchor=tk.W).pack(side=tk.LEFT, padx=5)
         
         # Buttons
-        btn_frame = tk.Frame(self.tutorial_frame, bg="#0d0d0d")
-        btn_frame.pack(pady=30)
+        btn_frame = tk.Frame(content, bg=BG_DARK)
+        btn_frame.pack(pady=(0, 10))
         
-        tk.Button(
-            btn_frame,
-            text="Set Region",
-            command=self.tutorial_set_region,
-            font=("Arial", 11, "bold"),
-            bg="#5a5a2d",
-            fg="#fff",
-            relief=tk.FLAT,
-            padx=20,
-            pady=8,
-            cursor="hand2"
-        ).pack(side=tk.LEFT, padx=10)
+        StyledButton(btn_frame, text="Set Region", command=self.tutorial_set_region,
+                    width=130, height=38, bg=BG_ACCENT, bg_hover="#6a6a3d",
+                    font=("Arial", 11), bold=True).pack(side=tk.LEFT, padx=8)
         
-        tk.Button(
-            btn_frame,
-            text="Skip for now",
-            command=self.close_tutorial,
-            font=("Arial", 10),
-            bg="#333",
-            fg="#999",
-            relief=tk.FLAT,
-            padx=15,
-            pady=8,
-            cursor="hand2"
-        ).pack(side=tk.LEFT, padx=10)
+        StyledButton(btn_frame, text="Skip", command=self.close_tutorial,
+                    width=80, height=38, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 10), fg=FG_DIM).pack(side=tk.LEFT, padx=8)
     
     def tutorial_set_region(self):
         """Set region from tutorial"""
@@ -672,17 +715,17 @@ class SettingsWindow:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Settings")
-        self.window.geometry("350x300")
+        self.window.geometry("380x320")
         self.window.resizable(False, False)
-        self.window.configure(bg="#0d0d0d")
+        self.window.configure(bg=BG_DARK)
         self.window.transient(parent)
         self.window.grab_set()
         
         # Center on screen
         self.window.update_idletasks()
-        x = (self.window.winfo_screenwidth() - 350) // 2
-        y = (self.window.winfo_screenheight() - 300) // 2
-        self.window.geometry(f"350x300+{x}+{y}")
+        x = (self.window.winfo_screenwidth() - 380) // 2
+        y = (self.window.winfo_screenheight() - 320) // 2
+        self.window.geometry(f"380x320+{x}+{y}")
         
         self.setup_ui()
     
@@ -690,50 +733,63 @@ class SettingsWindow:
         from config import load_settings, get_region
         self.settings = load_settings()
         
-        bg = "#0d0d0d"
-        
         # Title
-        tk.Label(self.window, text="Settings", font=("Arial", 16, "bold"), bg=bg, fg="#ffffff").pack(pady=(20, 20))
+        tk.Label(self.window, text="Settings", font=("Arial", 18, "bold"), bg=BG_DARK, fg=FG_WHITE).pack(pady=(25, 20))
         
         # Main content frame
-        content = tk.Frame(self.window, bg=bg)
-        content.pack(fill=tk.BOTH, expand=True, padx=25)
+        content = tk.Frame(self.window, bg=BG_DARK)
+        content.pack(fill=tk.BOTH, expand=True, padx=30)
         
-        # Forge Slots region
-        tk.Label(content, text="Screen Regions", font=("Arial", 10, "bold"), bg=bg, fg="#ffdb4a").pack(anchor=tk.W, pady=(0, 10))
+        # Screen Regions section
+        tk.Label(content, text="Screen Regions", font=("Arial", 11, "bold"), bg=BG_DARK, fg=FG_GOLD).pack(anchor=tk.W, pady=(0, 12))
         
-        slots_frame = tk.Frame(content, bg=bg)
-        slots_frame.pack(fill=tk.X, pady=5)
+        # Forge Slots row in a card
+        slots_card = tk.Frame(content, bg=BG_CARD, padx=15, pady=12)
+        slots_card.pack(fill=tk.X, pady=(0, 15))
         
-        tk.Label(slots_frame, text="Forge Slots:", font=("Arial", 10), bg=bg, fg="#ccc").pack(side=tk.LEFT)
+        tk.Label(slots_card, text="Forge Slots", font=("Arial", 11), bg=BG_CARD, fg=FG_WHITE).pack(side=tk.LEFT)
         
         slots_region = get_region("forge_slots")
-        slots_text = f"{slots_region['width']}x{slots_region['height']}" if slots_region else "Not set"
-        slots_color = "#4ade80" if slots_region else "#666"
-        self.slots_label = tk.Label(slots_frame, text=slots_text, font=("Arial", 9), bg=bg, fg=slots_color)
-        self.slots_label.pack(side=tk.LEFT, padx=10)
+        slots_text = f"{slots_region['width']}×{slots_region['height']}" if slots_region else "Not configured"
+        slots_color = FG_GREEN if slots_region else FG_DIM
+        self.slots_label = tk.Label(slots_card, text=slots_text, font=("Arial", 10), bg=BG_CARD, fg=slots_color)
+        self.slots_label.pack(side=tk.LEFT, padx=15)
         
-        tk.Button(slots_frame, text="Set", command=lambda: self.set_region("forge_slots"), bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=10).pack(side=tk.RIGHT)
+        StyledButton(slots_card, text="Set", command=lambda: self.set_region("forge_slots"),
+                    width=60, height=28, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 9)).pack(side=tk.RIGHT)
         
-        # Preferences
-        tk.Label(content, text="Preferences", font=("Arial", 10, "bold"), bg=bg, fg="#ffdb4a").pack(anchor=tk.W, pady=(20, 10))
+        # Preferences section
+        tk.Label(content, text="Preferences", font=("Arial", 11, "bold"), bg=BG_DARK, fg=FG_GOLD).pack(anchor=tk.W, pady=(5, 12))
+        
+        prefs_card = tk.Frame(content, bg=BG_CARD, padx=15, pady=12)
+        prefs_card.pack(fill=tk.X)
         
         # Auto mode
         self.auto_var = tk.BooleanVar(value=self.settings.get("preferences", {}).get("auto_mode", True))
-        auto_cb = tk.Checkbutton(content, text="Auto-detect Forge UI", variable=self.auto_var, font=("Arial", 10), bg=bg, fg="#ccc", selectcolor="#1a1a1a", activebackground=bg, activeforeground="#ccc")
-        auto_cb.pack(anchor=tk.W, pady=2)
+        auto_cb = tk.Checkbutton(prefs_card, text="Auto-detect Forge UI", variable=self.auto_var, 
+                                 font=("Arial", 11), bg=BG_CARD, fg=FG_WHITE, 
+                                 selectcolor=BG_DARK, activebackground=BG_CARD, activeforeground=FG_WHITE)
+        auto_cb.pack(anchor=tk.W, pady=3)
         
         # Always on top
         self.topmost_var = tk.BooleanVar(value=self.settings.get("preferences", {}).get("always_on_top", True))
-        top_cb = tk.Checkbutton(content, text="Always on top", variable=self.topmost_var, font=("Arial", 10), bg=bg, fg="#ccc", selectcolor="#1a1a1a", activebackground=bg, activeforeground="#ccc")
-        top_cb.pack(anchor=tk.W, pady=2)
+        top_cb = tk.Checkbutton(prefs_card, text="Always on top", variable=self.topmost_var, 
+                                font=("Arial", 11), bg=BG_CARD, fg=FG_WHITE, 
+                                selectcolor=BG_DARK, activebackground=BG_CARD, activeforeground=FG_WHITE)
+        top_cb.pack(anchor=tk.W, pady=3)
         
         # Buttons at bottom
-        btn_frame = tk.Frame(self.window, bg=bg)
-        btn_frame.pack(fill=tk.X, padx=25, pady=20)
+        btn_frame = tk.Frame(self.window, bg=BG_DARK)
+        btn_frame.pack(fill=tk.X, padx=30, pady=20)
         
-        tk.Button(btn_frame, text="Cancel", command=self.window.destroy, bg="#333", fg="#ccc", font=("Arial", 10), relief=tk.FLAT, padx=15, pady=5).pack(side=tk.LEFT)
-        tk.Button(btn_frame, text="Save", command=self.save, bg="#2d5a2d", fg="#fff", font=("Arial", 10, "bold"), relief=tk.FLAT, padx=20, pady=5).pack(side=tk.RIGHT)
+        StyledButton(btn_frame, text="Cancel", command=self.window.destroy,
+                    width=90, height=34, bg=BG_BUTTON, bg_hover=BG_BUTTON_HOVER,
+                    font=("Arial", 10)).pack(side=tk.LEFT)
+        
+        StyledButton(btn_frame, text="Save", command=self.save,
+                    width=90, height=34, bg=BG_PRIMARY, bg_hover=BG_PRIMARY_HOVER,
+                    font=("Arial", 10), bold=True).pack(side=tk.RIGHT)
     
     def set_region(self, region_name):
         """Open region selector for a specific region"""
