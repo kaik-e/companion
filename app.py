@@ -163,6 +163,8 @@ class ForgerCompanion:
         
         # State
         self.scanning = False
+        self.auto_mode = True  # Auto-detect forge UI
+        self.forge_ui_visible = False
         self.scan_region = None
         self.detected_ores = {}
         self.craft_type = "Weapon"
@@ -171,18 +173,26 @@ class ForgerCompanion:
         
         self.setup_ui()
         
+        # Start auto-detection in background
+        if self.auto_mode:
+            self.start_auto_detect()
+        
     def setup_ui(self):
         # Controls bar at top
         controls = tk.Frame(self.root, bg="#1a1a1a")
         controls.pack(fill=tk.X, padx=10, pady=8)
         
-        self.scan_btn = tk.Button(controls, text="▶ Scan", command=self.toggle_scan, bg="#2d5a2d", fg="white", font=("Arial", 9, "bold"), relief=tk.FLAT, padx=12, pady=2)
+        # Auto mode indicator
+        self.auto_indicator = tk.Label(controls, text="●", font=("Arial", 12), bg="#1a1a1a", fg="#666")
+        self.auto_indicator.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.auto_btn = tk.Button(controls, text="Auto", command=self.toggle_auto_mode, bg="#2d5a2d", fg="white", font=("Arial", 9, "bold"), relief=tk.FLAT, padx=8, pady=2)
+        self.auto_btn.pack(side=tk.LEFT, padx=2)
+        
+        self.scan_btn = tk.Button(controls, text="▶ Scan", command=self.toggle_scan, bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=12, pady=2)
         self.scan_btn.pack(side=tk.LEFT, padx=2)
         
         tk.Button(controls, text="Region", command=self.set_region, bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=8, pady=2).pack(side=tk.LEFT, padx=2)
-        
-        self.craft_btn = tk.Button(controls, text="Weapon", command=self.toggle_craft_type, bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=8, pady=2)
-        self.craft_btn.pack(side=tk.LEFT, padx=2)
         
         # Enhancement controls
         tk.Button(controls, text="-", command=self.decrease_enhancement, bg="#333", fg="#ccc", font=("Arial", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.RIGHT, padx=1)
@@ -261,7 +271,7 @@ class ForgerCompanion:
         status_frame = tk.Frame(self.root, bg="#1a1a1a")
         status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
         
-        self.status_label = tk.Label(status_frame, text="Click Scan to start", font=("Arial", 8), bg="#1a1a1a", fg="#666", anchor=tk.W)
+        self.status_label = tk.Label(status_frame, text="Waiting for Forge UI...", font=("Arial", 8), bg="#1a1a1a", fg="#666", anchor=tk.W)
         self.status_label.pack(side=tk.LEFT)
         
         # License info
@@ -279,6 +289,58 @@ class ForgerCompanion:
         
         # Right-click to toggle debug
         self.root.bind("<Button-3>", lambda e: self.toggle_debug())
+    
+    def start_auto_detect(self):
+        """Start background thread for auto-detecting forge UI"""
+        def auto_detect_loop():
+            while self.auto_mode:
+                try:
+                    from ocr_scanner import detect_forge_ui
+                    is_forge, _ = detect_forge_ui(self.scan_region)
+                    
+                    # Update UI in main thread
+                    self.root.after(0, lambda v=is_forge: self.on_forge_ui_detected(v))
+                    
+                except Exception as e:
+                    print(f"[auto] Detection error: {e}")
+                
+                time.sleep(1.5)  # Check every 1.5 seconds
+        
+        threading.Thread(target=auto_detect_loop, daemon=True).start()
+    
+    def on_forge_ui_detected(self, visible):
+        """Called when forge UI detection state changes"""
+        if visible != self.forge_ui_visible:
+            self.forge_ui_visible = visible
+            
+            if visible:
+                # Forge UI appeared - start scanning
+                self.auto_indicator.config(fg="#4ade80")  # Green
+                self.status_label.config(text="Forge UI detected!")
+                if not self.scanning:
+                    self.scanning = True
+                    self.scan_btn.config(text="⏸ Stop", bg="#5a2d2d")
+                    threading.Thread(target=self.scan_loop, daemon=True).start()
+            else:
+                # Forge UI gone - stop scanning
+                self.auto_indicator.config(fg="#666")  # Gray
+                self.status_label.config(text="Waiting for Forge UI...")
+                self.scanning = False
+                self.scan_btn.config(text="▶ Scan", bg="#333")
+                self.clear_display()
+    
+    def toggle_auto_mode(self):
+        """Toggle auto-detection mode"""
+        self.auto_mode = not self.auto_mode
+        
+        if self.auto_mode:
+            self.auto_btn.config(bg="#2d5a2d")
+            self.status_label.config(text="Auto mode: ON")
+            self.start_auto_detect()
+        else:
+            self.auto_btn.config(bg="#333")
+            self.auto_indicator.config(fg="#666")
+            self.status_label.config(text="Auto mode: OFF")
         
     def toggle_scan(self):
         self.scanning = not self.scanning

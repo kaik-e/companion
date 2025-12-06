@@ -59,6 +59,33 @@ def capture_screen(region=None):
         return np.array(img)
 
 
+def detect_forge_ui(region=None):
+    """Check if the Forge UI is currently visible on screen"""
+    img = capture_screen(region)
+    
+    # Quick OCR scan
+    results = reader.readtext(img)
+    raw_text = " ".join([text for _, text, _ in results]).lower()
+    
+    # Look for unique Forge UI elements
+    forge_indicators = [
+        "forge chances",      # Left panel title
+        "forge / select",     # Right panel title  
+        "select ores",        # Right panel
+        "forge!",             # Big button
+        "fast forge",         # Checkbox
+        "multiplier:",        # Multiplier display
+    ]
+    
+    matches = sum(1 for indicator in forge_indicators if indicator in raw_text)
+    
+    # Need at least 2 indicators to confirm forge UI
+    is_forge_ui = matches >= 2
+    
+    print(f"[detect] Forge UI check: {matches} indicators found -> {'YES' if is_forge_ui else 'NO'}")
+    return is_forge_ui, raw_text
+
+
 def scan_for_ores(region=None):
     """Capture screen and detect ores using OCR"""
     # Capture screen
