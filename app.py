@@ -597,17 +597,30 @@ class ForgerCompanion:
         self.armor_traits_label.config(text="  |  ".join(armor_traits) if armor_traits else "")
     
     def clear_display(self):
+        """Reset all display elements to default state"""
+        # Reset multiplier
+        self.multiplier_label.config(text="0.00x", fg=self.fg_color)
+        
+        # Reset ore slots
         for slot in self.ore_slots:
             slot["name"].config(text="Empty", fg="#444")
             slot["amount"].config(text="")
             slot["frame"].config(highlightbackground="#444")
             slot["pct"].config(text="")
+        
+        # Reset weapon display
         self.weapon_name_label.config(text="")
         self.weapon_stats_label.config(text="")
         self.weapon_traits_label.config(text="")
+        
+        # Reset armor display
         self.armor_name_label.config(text="")
         self.armor_stats_label.config(text="")
         self.armor_traits_label.config(text="")
+        
+        # Clear last result
+        self.last_result = None
+        self.detected_ores = {}
     
     def toggle_craft_type(self):
         if self.craft_type == "Weapon":

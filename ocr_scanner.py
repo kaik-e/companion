@@ -74,41 +74,38 @@ def detect_forge_ui(region=None):
     results = reader.readtext(img)
     raw_text = " ".join([text for _, text, _ in results]).lower()
     
-    # Primary detection: Look for "Empty" slots (most reliable indicator)
-    # The forge UI shows "Empty" text in each of the 4 ore slots
+    # Look for "Empty" slots
     empty_count = raw_text.count("empty")
     
-    # Secondary indicators for confirmation
+    # Forge UI indicators
     forge_indicators = [
         "forge chances",      # Left panel title
         "forge / select",     # Right panel title  
         "select ores",        # Right panel
         "forge!",             # Big button
         "fast forge",         # Checkbox
-        "multiplier",         # Multiplier display (without colon for flexibility)
+        "multiplier",         # Multiplier display
     ]
     
     indicator_matches = sum(1 for indicator in forge_indicators if indicator in raw_text)
     
+    # Check for ore count patterns (x1, x2, etc.) which indicate ores are placed
+    ore_count_pattern = any(f"x{i}" in raw_text for i in range(1, 21))
+    
     # Forge UI is detected if:
     # - We see "Empty" slots (1-4 empty slots means forge UI is open)
-    # - OR we see multiple forge indicators
-    is_forge_ui = empty_count >= 1 or indicator_matches >= 2
+    # - OR we see multiple forge indicators (covers case when all 4 slots filled)
+    # - OR we see ore count patterns with at least 1 indicator
+    is_forge_ui = (empty_count >= 1 or 
+                   indicator_matches >= 2 or 
+                   (ore_count_pattern and indicator_matches >= 1))
     
-    # Check if ores are placed (less than 4 empty slots means some ores are in)
-    # Also check for ore names or "x" counts which indicate ores placed
-    has_ores_placed = False
-    if is_forge_ui:
-        # If we see fewer than 4 "Empty" texts, ores are placed
-        # Or if we detect any ore patterns
-        if empty_count < 4 and empty_count >= 0:
-            # Check for ore-related text
-            ore_indicators = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", 
-                             "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20"]
-            has_ore_count = any(ind in raw_text for ind in ore_indicators)
-            has_ores_placed = has_ore_count or empty_count < 4
+    # Ores are placed if:
+    # - We see ore count patterns (x1, x2, etc.)
+    # - OR we have fewer than 4 empty slots (some are filled)
+    has_ores_placed = ore_count_pattern or (is_forge_ui and empty_count < 4)
     
-    print(f"[detect] Forge UI: {is_forge_ui} | Empty slots: {empty_count} | Ores placed: {has_ores_placed} | Indicators: {indicator_matches}")
+    print(f"[detect] Forge UI: {is_forge_ui} | Empty: {empty_count} | Ores: {has_ores_placed} | Indicators: {indicator_matches} | OrePattern: {ore_count_pattern}")
     return is_forge_ui, has_ores_placed, raw_text
 
 
