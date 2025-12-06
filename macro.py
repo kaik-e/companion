@@ -71,17 +71,38 @@ class INPUT(ctypes.Structure):
 
 def click_at(x, y):
     """Click at specific screen coordinates"""
+    import ctypes
+    
     # Move mouse first
     user32.SetCursorPos(x, y)
-    time.sleep(0.2)  # Wait for mouse to settle
+    time.sleep(0.15)
     
-    # Click down
+    # Try multiple click methods for compatibility
+    
+    # Method 1: mouse_event (older but sometimes works better)
     user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-    time.sleep(0.1)  # Hold for a moment
-    
-    # Click up
+    time.sleep(0.08)
     user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-    time.sleep(0.1)  # Wait after click
+    time.sleep(0.05)
+    
+    # Method 2: Also send via SendInput for games that need it
+    extra = ctypes.c_ulong(0)
+    ii_ = INPUT()
+    ii_.type = INPUT_MOUSE
+    ii_._input.mi.dx = 0
+    ii_._input.mi.dy = 0
+    ii_._input.mi.mouseData = 0
+    ii_._input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN
+    ii_._input.mi.time = 0
+    ii_._input.mi.dwExtraInfo = ctypes.pointer(extra)
+    user32.SendInput(1, ctypes.pointer(ii_), ctypes.sizeof(ii_))
+    
+    time.sleep(0.08)
+    
+    ii_._input.mi.dwFlags = MOUSEEVENTF_LEFTUP
+    user32.SendInput(1, ctypes.pointer(ii_), ctypes.sizeof(ii_))
+    
+    time.sleep(0.1)
 
 
 def hold_click(duration_seconds):
