@@ -1,11 +1,36 @@
 """OCR Scanner using EasyOCR"""
 
 import re
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))
+
 import easyocr
 import mss
 import numpy as np
 from PIL import Image
-from ores import ORES, ORE_PATTERNS
+from data import ORES
+
+# Build OCR patterns from ore names
+ORE_PATTERNS = {}
+for ore_name in ORES.keys():
+    name_lower = ore_name.lower()
+    base = name_lower.replace(" ore", "").replace(" crystal", "").strip()
+    
+    ORE_PATTERNS[name_lower] = ore_name
+    ORE_PATTERNS[base] = ore_name
+    ORE_PATTERNS[base.replace(" ", "")] = ore_name
+    
+    if len(base) >= 5:
+        ORE_PATTERNS[base[:5]] = ore_name
+
+# Special patterns for OCR misreads
+ORE_PATTERNS["eye"] = "Eye Ore"
+ORE_PATTERNS["mythri"] = "Mythril Ore"
+ORE_PATTERNS["rival"] = "Rivalite Ore"
+ORE_PATTERNS["topa"] = "Topaz Ore"
+ORE_PATTERNS["magma"] = "Magmaite Ore"
+ORE_PATTERNS["magmai"] = "Magmaite Ore"
 
 # Initialize EasyOCR reader (downloads model on first run)
 print("Loading EasyOCR model...")
@@ -80,7 +105,7 @@ def scan_for_ores(region=None):
         
         if best_match:
             ore_items.append({
-                "ore_id": best_match,
+                "ore_name": best_match,  # This is now the full ore name like "Eye Ore"
                 "x": item["x"],
                 "y": item["y"],
                 "text": item["text"]
@@ -103,13 +128,14 @@ def scan_for_ores(region=None):
                     "used": False
                 })
     
-    print(f"Ore items: {[(o['ore_id'], o['x']) for o in ore_items]}")
+    print(f"Ore items: {[(o['ore_name'], o['x']) for o in ore_items]}")
     print(f"Count items: {[(c['count'], c['x']) for c in count_items]}")
     
     # Match each ore with its closest count (must be below and horizontally close)
     detected = {}
     for ore in ore_items:
-        if ore["ore_id"] in detected:
+        ore_name = ore["ore_name"]
+        if ore_name in detected:
             continue
         
         best_count = 1
@@ -136,15 +162,15 @@ def scan_for_ores(region=None):
         if best_count_item:
             best_count_item["used"] = True
         
-        ore_id = ore["ore_id"]
-        detected[ore_id] = {
-            "id": ore_id,
-            "name": ORES[ore_id]["name"],
-            "count": best_count,
-            "rarity": ORES[ore_id]["rarity"],
-            "multiplier": ORES[ore_id]["multiplier"]
-        }
-        print(f"Found: {ORES[ore_id]['name']} x{best_count} (ore_x={ore['x']:.0f})")
+        ore_data = ORES.get(ore_name)
+        if ore_data:
+            detected[ore_name] = {
+                "name": ore_name,
+                "count": best_count,
+                "rarity": ore_data["rarity"],
+                "multiplier": ore_data["multiplier"]
+            }
+            print(f"Found: {ore_name} x{best_count} (ore_x={ore['x']:.0f})")
     
     return detected, raw_text
 

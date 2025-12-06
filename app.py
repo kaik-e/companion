@@ -172,7 +172,7 @@ class ForgerCompanion:
             fg="#FFD700"
         )
         self.masterwork_label.pack()
-        tk.Label(mw_frame, text="Masterwork", font=("Segoe UI", 8), bg="#24283b", fg=self.dim_color).pack()
+        tk.Label(mw_frame, text="Total Ores", font=("Segoe UI", 8), bg="#24283b", fg=self.dim_color).pack()
         
         # Separator
         tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=5)
@@ -285,15 +285,14 @@ class ForgerCompanion:
             # Update top stats
             self.multiplier_label.config(text=f"{result['multiplier']}x")
             self.rarity_label.config(text=result['rarity'], fg=result['rarity_color'])
-            self.masterwork_label.config(text=f"{result['masterwork_chance']}%")
+            self.masterwork_label.config(text=f"{result['total_ores']}")
             
-            # Update item odds
+            # Update item odds with damage and MW price
             for widget in self.items_frame.winfo_children():
                 widget.destroy()
             
-            for item_type, stats in sorted(result['item_odds'].items(), key=lambda x: -x[1]['odds']):
+            for item_type, stats in result['item_stats'].items():
                 pct = int(stats['odds'] * 100)
-                stat_range = f"{stats['min']}-{stats['max']}"
                 
                 item_row = tk.Frame(self.items_frame, bg="#24283b")
                 item_row.pack(fill=tk.X, pady=1)
@@ -305,7 +304,7 @@ class ForgerCompanion:
                     bg="#24283b",
                     fg=self.fg_color,
                     anchor=tk.W,
-                    width=15
+                    width=14
                 ).pack(side=tk.LEFT)
                 
                 tk.Label(
@@ -314,16 +313,31 @@ class ForgerCompanion:
                     font=("Segoe UI", 8, "bold"),
                     bg="#24283b",
                     fg=self.accent_color,
-                    width=5
+                    width=4
                 ).pack(side=tk.LEFT)
                 
-                tk.Label(
-                    item_row,
-                    text=f"{stat_range} {result['stat_name']}",
-                    font=("Segoe UI", 8),
-                    bg="#24283b",
-                    fg=self.dim_color
-                ).pack(side=tk.LEFT)
+                # Damage (weapons only)
+                if stats.get('damage'):
+                    tk.Label(
+                        item_row,
+                        text=f"{stats['damage']:.1f}dmg",
+                        font=("Segoe UI", 8),
+                        bg="#24283b",
+                        fg="#9ece6a",
+                        width=7
+                    ).pack(side=tk.LEFT)
+                
+                # Masterwork price
+                if stats.get('mw_price'):
+                    from data import format_price
+                    tk.Label(
+                        item_row,
+                        text=f"MW:{format_price(stats['mw_price'])}",
+                        font=("Segoe UI", 8),
+                        bg="#24283b",
+                        fg="#FFD700",
+                        width=8
+                    ).pack(side=tk.LEFT)
             
             # Update ores list
             for widget in self.ores_frame.winfo_children():
@@ -344,24 +358,33 @@ class ForgerCompanion:
             for widget in self.traits_frame.winfo_children():
                 widget.destroy()
             
-            if result["traits"]:
-                for trait in result["traits"]:
+            for trait in result["traits"]:
+                if trait.get("source"):
                     tk.Label(
                         self.traits_frame,
-                        text=f"✦ {trait['name']} ({trait['source']})",
+                        text=f"✦ {trait['text']}",
                         font=("Segoe UI", 8),
                         bg="#24283b",
                         fg="#bb9af7",
+                        anchor=tk.W,
+                        wraplength=280
+                    ).pack(fill=tk.X)
+                    tk.Label(
+                        self.traits_frame,
+                        text=f"   ({trait['source']})",
+                        font=("Segoe UI", 7),
+                        bg="#24283b",
+                        fg=self.dim_color,
                         anchor=tk.W
                     ).pack(fill=tk.X)
-            else:
-                tk.Label(
-                    self.traits_frame,
-                    text="None",
-                    font=("Segoe UI", 8),
-                    bg="#24283b",
-                    fg=self.dim_color
-                ).pack()
+                else:
+                    tk.Label(
+                        self.traits_frame,
+                        text=trait['text'],
+                        font=("Segoe UI", 8),
+                        bg="#24283b",
+                        fg=self.dim_color
+                    ).pack(fill=tk.X)
         else:
             self.multiplier_label.config(text="--")
             self.rarity_label.config(text="--", fg="#FFFFFF")
