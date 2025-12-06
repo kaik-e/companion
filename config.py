@@ -16,8 +16,10 @@ DEFAULT_SETTINGS = {
     },
     "macro_buttons": {
         "forge_button": None,    # Click position for FORGE! button
+        "inventory": None,       # Click position for Inventory button
+        "sell_tab": None,        # Click position for Sell tab
         "select_all": None,      # Click position for Select All button
-        "sell_button": None,     # Click position for Sell button
+        "accept": None,          # Click position for Accept/Confirm button
     },
     "macro_settings": {
         "enabled": False,
@@ -138,6 +140,8 @@ def is_macro_setup_complete() -> bool:
     buttons = settings.get("macro_buttons", {})
     return all([
         buttons.get("forge_button"),
+        buttons.get("inventory"),
+        buttons.get("sell_tab"),
         buttons.get("select_all"),
-        buttons.get("sell_button")
+        buttons.get("accept")
     ])

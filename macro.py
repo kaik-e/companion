@@ -69,8 +69,10 @@ class MacroController:
         self.settings = get_macro_settings()
         self.buttons = {
             "forge": get_macro_button("forge_button"),
+            "inventory": get_macro_button("inventory"),
+            "sell_tab": get_macro_button("sell_tab"),
             "select_all": get_macro_button("select_all"),
-            "sell": get_macro_button("sell_button"),
+            "accept": get_macro_button("accept"),
         }
     
     def reload_settings(self):
@@ -79,8 +81,10 @@ class MacroController:
         self.settings = get_macro_settings()
         self.buttons = {
             "forge": get_macro_button("forge_button"),
+            "inventory": get_macro_button("inventory"),
+            "sell_tab": get_macro_button("sell_tab"),
             "select_all": get_macro_button("select_all"),
-            "sell": get_macro_button("sell_button"),
+            "accept": get_macro_button("accept"),
         }
     
     def update_status(self, status):
@@ -160,19 +164,30 @@ class MacroController:
                 if not self.running:
                     break
                 
-                # Step 2: Auto-sell sequence
+                # Step 2: Auto-sell sequence (Inventory > Sell > Select All > Accept)
                 if self.settings.get("auto_sell", True):
-                    self.update_status("Auto-selling...")
+                    # Click Inventory
+                    self.update_status("Opening inventory...")
+                    inv_pos = self.buttons["inventory"]
+                    click_at(inv_pos["x"], inv_pos["y"])
                     time.sleep(0.5)
                     
+                    # Click Sell tab
+                    self.update_status("Opening sell tab...")
+                    sell_tab_pos = self.buttons["sell_tab"]
+                    click_at(sell_tab_pos["x"], sell_tab_pos["y"])
+                    time.sleep(0.4)
+                    
                     # Click Select All
+                    self.update_status("Selecting all...")
                     select_pos = self.buttons["select_all"]
                     click_at(select_pos["x"], select_pos["y"])
                     time.sleep(0.3)
                     
-                    # Click Sell
-                    sell_pos = self.buttons["sell"]
-                    click_at(sell_pos["x"], sell_pos["y"])
+                    # Click Accept
+                    self.update_status("Accepting...")
+                    accept_pos = self.buttons["accept"]
+                    click_at(accept_pos["x"], accept_pos["y"])
                     time.sleep(0.5)
                     
                     self.update_status("Sold! Starting next cycle...")

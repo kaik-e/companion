@@ -713,6 +713,10 @@ class ForgerCompanion:
         self.forge_ui_visible = visible
         
         if visible:
+            # Auto-switch to Calculator tab when Forge UI is detected
+            if self.current_tab != "calc":
+                self.switch_tab("calc")
+            
             if has_ores:
                 # Ores are placed - start scanning!
                 self.waiting_for_ores = False
@@ -934,7 +938,14 @@ class ForgerCompanion:
     
     def open_settings(self):
         """Open settings window"""
-        SettingsWindow(self.root, self.on_settings_changed)
+        # Prevent opening multiple settings windows
+        if hasattr(self, 'settings_window') and self.settings_window:
+            try:
+                self.settings_window.window.lift()
+                return
+            except:
+                pass
+        self.settings_window = SettingsWindow(self.root, self.on_settings_changed)
     
     def on_settings_changed(self):
         """Called when settings are updated"""
@@ -943,6 +954,7 @@ class ForgerCompanion:
         self.scan_region = get_region("forge_slots")
         self.ores_region = get_region("ores_panel")
         self.status_label.config(text="Settings updated")
+        self.settings_window = None  # Clear reference
     
     def show_tutorial(self):
         """Show first-time tutorial overlay"""
@@ -1300,7 +1312,7 @@ class MacroSettingsWindow:
         
         self.window = tk.Toplevel(parent)
         self.window.title("Macro Settings")
-        self.window.geometry("400x480")
+        self.window.geometry("400x560")
         self.window.resizable(False, False)
         self.window.configure(bg=BG_DARK)
         self.window.transient(parent)
@@ -1311,8 +1323,8 @@ class MacroSettingsWindow:
         # Center
         self.window.update_idletasks()
         x = (self.window.winfo_screenwidth() - 400) // 2
-        y = (self.window.winfo_screenheight() - 480) // 2
-        self.window.geometry(f"400x480+{x}+{y}")
+        y = (self.window.winfo_screenheight() - 560) // 2
+        self.window.geometry(f"400x560+{x}+{y}")
         
         self.setup_ui()
     
@@ -1336,13 +1348,19 @@ class MacroSettingsWindow:
         buttons_card.pack(fill=tk.X, pady=(0, 15))
         
         # Forge button
-        self.forge_label = self._create_button_row(buttons_card, "Forge Button", "forge_button")
+        self._create_button_row(buttons_card, "Forge Button", "forge_button")
+        
+        # Inventory button
+        self._create_button_row(buttons_card, "Inventory", "inventory")
+        
+        # Sell tab
+        self._create_button_row(buttons_card, "Sell Tab", "sell_tab")
         
         # Select All button
-        self.select_label = self._create_button_row(buttons_card, "Select All", "select_all")
+        self._create_button_row(buttons_card, "Select All", "select_all")
         
-        # Sell button
-        self.sell_label = self._create_button_row(buttons_card, "Sell Button", "sell_button")
+        # Accept button
+        self._create_button_row(buttons_card, "Accept", "accept")
         
         # Duration section
         tk.Label(content, text="Settings", font=("Arial", 11, "bold"), bg=BG_DARK, fg=FG_GOLD).pack(anchor=tk.W, pady=(10, 10))
@@ -1417,8 +1435,10 @@ class MacroSettingsWindow:
         
         instructions = {
             "forge_button": "Click on the FORGE button",
+            "inventory": "Click on the INVENTORY button",
+            "sell_tab": "Click on the SELL tab",
             "select_all": "Click on the SELECT ALL button",
-            "sell_button": "Click on the SELL button"
+            "accept": "Click on the ACCEPT button"
         }
         
         def on_picked(position):
