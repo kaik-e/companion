@@ -6,14 +6,14 @@ import threading
 import time
 from ocr_scanner import scan_for_ores
 from calculator import calculate_forge
-from ores import ORES, RARITY_COLORS
+from data import ORES, RARITY_COLORS, calculate_weapon_damage, calculate_masterwork_price, format_price
 
 
 class ForgerCompanion:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Forger Companion")
-        self.root.geometry("320x550")
+        self.root.geometry("340x620")
         self.root.attributes("-topmost", True)
         self.root.attributes("-alpha", 0.9)
         
@@ -31,6 +31,8 @@ class ForgerCompanion:
         self.detected_ores = {}
         self.craft_type = "Weapon"
         self.opacity = 0.9
+        self.enhancement_level = 0
+        self.last_result = None
         
         self.setup_ui()
         
@@ -127,96 +129,93 @@ class ForgerCompanion:
         )
         self.status_label.pack(fill=tk.X, padx=5)
         
-        # Results frame with scrollable canvas
+        # Results frame
         results_container = tk.Frame(self.root, bg="#24283b")
         results_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Top stats row
-        stats_frame = tk.Frame(results_container, bg="#24283b")
-        stats_frame.pack(fill=tk.X, padx=5, pady=5)
+        # === MAIN RESULT SECTION ===
+        main_result_frame = tk.Frame(results_container, bg="#1f2335")
+        main_result_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Top row: Multiplier | Rarity | Total Ores
+        stats_frame = tk.Frame(main_result_frame, bg="#1f2335")
+        stats_frame.pack(fill=tk.X, padx=5, pady=3)
         
         # Multiplier
-        mult_frame = tk.Frame(stats_frame, bg="#24283b")
+        mult_frame = tk.Frame(stats_frame, bg="#1f2335")
         mult_frame.pack(side=tk.LEFT, expand=True)
-        self.multiplier_label = tk.Label(
-            mult_frame,
-            text="--",
-            font=("Segoe UI", 20, "bold"),
-            bg="#24283b",
-            fg=self.accent_color
-        )
+        self.multiplier_label = tk.Label(mult_frame, text="--", font=("Segoe UI", 18, "bold"), bg="#1f2335", fg=self.accent_color)
         self.multiplier_label.pack()
-        tk.Label(mult_frame, text="Multiplier", font=("Segoe UI", 8), bg="#24283b", fg=self.dim_color).pack()
+        tk.Label(mult_frame, text="Multiplier", font=("Segoe UI", 7), bg="#1f2335", fg=self.dim_color).pack()
         
         # Rarity
-        rarity_frame = tk.Frame(stats_frame, bg="#24283b")
+        rarity_frame = tk.Frame(stats_frame, bg="#1f2335")
         rarity_frame.pack(side=tk.LEFT, expand=True)
-        self.rarity_label = tk.Label(
-            rarity_frame,
-            text="--",
-            font=("Segoe UI", 12, "bold"),
-            bg="#24283b",
-            fg="#FFFFFF"
-        )
+        self.rarity_label = tk.Label(rarity_frame, text="--", font=("Segoe UI", 11, "bold"), bg="#1f2335", fg="#FFFFFF")
         self.rarity_label.pack()
-        tk.Label(rarity_frame, text="Rarity", font=("Segoe UI", 8), bg="#24283b", fg=self.dim_color).pack()
+        tk.Label(rarity_frame, text="Rarity", font=("Segoe UI", 7), bg="#1f2335", fg=self.dim_color).pack()
         
-        # Masterwork
-        mw_frame = tk.Frame(stats_frame, bg="#24283b")
-        mw_frame.pack(side=tk.LEFT, expand=True)
-        self.masterwork_label = tk.Label(
-            mw_frame,
-            text="--",
-            font=("Segoe UI", 12, "bold"),
-            bg="#24283b",
-            fg="#FFD700"
-        )
-        self.masterwork_label.pack()
-        tk.Label(mw_frame, text="Total Ores", font=("Segoe UI", 8), bg="#24283b", fg=self.dim_color).pack()
+        # Total Ores
+        ores_count_frame = tk.Frame(stats_frame, bg="#1f2335")
+        ores_count_frame.pack(side=tk.LEFT, expand=True)
+        self.total_ores_label = tk.Label(ores_count_frame, text="--", font=("Segoe UI", 11, "bold"), bg="#1f2335", fg="#FFD700")
+        self.total_ores_label.pack()
+        tk.Label(ores_count_frame, text="Total Ores", font=("Segoe UI", 7), bg="#1f2335", fg=self.dim_color).pack()
         
-        # Separator
-        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=5)
+        # === HIGHEST % WEAPON/ARMOR ===
+        tk.Frame(main_result_frame, bg=self.dim_color, height=1).pack(fill=tk.X, padx=5, pady=3)
         
-        # Item odds section
-        self.items_label = tk.Label(
-            results_container,
-            text="Possible Items",
-            font=("Segoe UI", 9, "bold"),
-            bg="#24283b",
-            fg=self.fg_color
-        )
-        self.items_label.pack(anchor=tk.W, padx=10)
+        self.best_item_frame = tk.Frame(main_result_frame, bg="#1f2335")
+        self.best_item_frame.pack(fill=tk.X, padx=5, pady=3)
         
-        self.items_frame = tk.Frame(results_container, bg="#24283b")
-        self.items_frame.pack(fill=tk.X, padx=10, pady=2)
+        self.best_item_label = tk.Label(self.best_item_frame, text="Best: --", font=("Segoe UI", 10, "bold"), bg="#1f2335", fg=self.fg_color)
+        self.best_item_label.pack(anchor=tk.W)
         
-        # Separator
-        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=5)
+        self.best_damage_label = tk.Label(self.best_item_frame, text="Damage: --", font=("Segoe UI", 9), bg="#1f2335", fg="#9ece6a")
+        self.best_damage_label.pack(anchor=tk.W)
         
-        # Detected ores section
-        tk.Label(
-            results_container,
-            text="Detected Ores",
-            font=("Segoe UI", 9, "bold"),
-            bg="#24283b",
-            fg=self.fg_color
-        ).pack(anchor=tk.W, padx=10)
+        self.best_mw_label = tk.Label(self.best_item_frame, text="MW Price: --", font=("Segoe UI", 9), bg="#1f2335", fg="#FFD700")
+        self.best_mw_label.pack(anchor=tk.W)
+        
+        # === ENHANCEMENT CONTROLS ===
+        tk.Frame(main_result_frame, bg=self.dim_color, height=1).pack(fill=tk.X, padx=5, pady=3)
+        
+        enh_frame = tk.Frame(main_result_frame, bg="#1f2335")
+        enh_frame.pack(fill=tk.X, padx=5, pady=3)
+        
+        tk.Label(enh_frame, text="Enhancement:", font=("Segoe UI", 9), bg="#1f2335", fg=self.fg_color).pack(side=tk.LEFT)
+        
+        tk.Button(enh_frame, text="-", command=self.decrease_enhancement, bg="#414868", fg=self.fg_color, font=("Segoe UI", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.LEFT, padx=2)
+        
+        self.enh_label = tk.Label(enh_frame, text="+0", font=("Segoe UI", 10, "bold"), bg="#1f2335", fg="#ff9e64", width=3)
+        self.enh_label.pack(side=tk.LEFT, padx=2)
+        
+        tk.Button(enh_frame, text="+", command=self.increase_enhancement, bg="#414868", fg=self.fg_color, font=("Segoe UI", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.LEFT, padx=2)
+        
+        # Enhanced damage display
+        self.enh_damage_label = tk.Label(enh_frame, text="", font=("Segoe UI", 9), bg="#1f2335", fg="#9ece6a")
+        self.enh_damage_label.pack(side=tk.LEFT, padx=10)
+        
+        # === ORE COMPOSITION ===
+        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=3)
+        
+        tk.Label(results_container, text="Ore Composition", font=("Segoe UI", 9, "bold"), bg="#24283b", fg=self.fg_color).pack(anchor=tk.W, padx=10)
         
         self.ores_frame = tk.Frame(results_container, bg="#24283b")
         self.ores_frame.pack(fill=tk.X, padx=10, pady=2)
         
-        # Separator
-        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=5)
+        # === ITEM ODDS ===
+        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=3)
         
-        # Traits section
-        self.traits_header = tk.Label(
-            results_container,
-            text="Traits",
-            font=("Segoe UI", 9, "bold"),
-            bg="#24283b",
-            fg=self.fg_color
-        )
-        self.traits_header.pack(anchor=tk.W, padx=10)
+        tk.Label(results_container, text="Item Odds", font=("Segoe UI", 9, "bold"), bg="#24283b", fg=self.fg_color).pack(anchor=tk.W, padx=10)
+        
+        self.items_frame = tk.Frame(results_container, bg="#24283b")
+        self.items_frame.pack(fill=tk.X, padx=10, pady=2)
+        
+        # === TRAITS ===
+        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=3)
+        
+        tk.Label(results_container, text="Traits", font=("Segoe UI", 9, "bold"), bg="#24283b", fg=self.fg_color).pack(anchor=tk.W, padx=10)
         
         self.traits_frame = tk.Frame(results_container, bg="#24283b")
         self.traits_frame.pack(fill=tk.X, padx=10, pady=2)
@@ -280,14 +279,57 @@ class ForgerCompanion:
         
         # Calculate forge
         result = calculate_forge(detected, self.craft_type)
+        self.last_result = result
         
         if result:
             # Update top stats
             self.multiplier_label.config(text=f"{result['multiplier']}x")
             self.rarity_label.config(text=result['rarity'], fg=result['rarity_color'])
-            self.masterwork_label.config(text=f"{result['total_ores']}")
+            self.total_ores_label.config(text=f"{result['total_ores']}")
             
-            # Update item odds with damage and MW price
+            # Find best item (highest odds)
+            best_item = None
+            best_odds = 0
+            for item_type, stats in result['item_stats'].items():
+                if stats['odds'] > best_odds:
+                    best_odds = stats['odds']
+                    best_item = item_type
+                    best_stats = stats
+            
+            if best_item:
+                self.best_item_label.config(text=f"Best: {best_item} ({int(best_odds * 100)}%)")
+                
+                # Calculate damage with enhancement
+                if self.craft_type == "Weapon" and best_stats.get('damage'):
+                    base_dmg = best_stats['damage']
+                    enh_mult = 1 + (self.enhancement_level * 0.05)
+                    enh_dmg = base_dmg * enh_mult
+                    self.best_damage_label.config(text=f"Damage: {enh_dmg:.1f}")
+                    self.enh_damage_label.config(text=f"(+{self.enhancement_level}: {enh_dmg:.1f})")
+                else:
+                    self.best_damage_label.config(text="")
+                    self.enh_damage_label.config(text="")
+                
+                if best_stats.get('mw_price'):
+                    self.best_mw_label.config(text=f"MW Price: {format_price(best_stats['mw_price'])}")
+                else:
+                    self.best_mw_label.config(text="")
+            
+            # Update ore composition with %
+            for widget in self.ores_frame.winfo_children():
+                widget.destroy()
+            
+            for ore_name, pct in result['composition'].items():
+                ore_data = ORES.get(ore_name, {})
+                color = RARITY_COLORS.get(ore_data.get("rarity"), "#FFFFFF")
+                
+                ore_row = tk.Frame(self.ores_frame, bg="#24283b")
+                ore_row.pack(fill=tk.X, pady=1)
+                
+                tk.Label(ore_row, text=f"{pct:.1f}%", font=("Segoe UI", 8, "bold"), bg="#24283b", fg=self.accent_color, width=6).pack(side=tk.LEFT)
+                tk.Label(ore_row, text=ore_name, font=("Segoe UI", 8), bg="#24283b", fg=color, anchor=tk.W).pack(side=tk.LEFT)
+            
+            # Update item odds
             for widget in self.items_frame.winfo_children():
                 widget.destroy()
             
@@ -297,62 +339,14 @@ class ForgerCompanion:
                 item_row = tk.Frame(self.items_frame, bg="#24283b")
                 item_row.pack(fill=tk.X, pady=1)
                 
-                tk.Label(
-                    item_row,
-                    text=f"{item_type}",
-                    font=("Segoe UI", 8),
-                    bg="#24283b",
-                    fg=self.fg_color,
-                    anchor=tk.W,
-                    width=14
-                ).pack(side=tk.LEFT)
+                tk.Label(item_row, text=f"{item_type}", font=("Segoe UI", 8), bg="#24283b", fg=self.fg_color, anchor=tk.W, width=14).pack(side=tk.LEFT)
+                tk.Label(item_row, text=f"{pct}%", font=("Segoe UI", 8, "bold"), bg="#24283b", fg=self.accent_color, width=4).pack(side=tk.LEFT)
                 
-                tk.Label(
-                    item_row,
-                    text=f"{pct}%",
-                    font=("Segoe UI", 8, "bold"),
-                    bg="#24283b",
-                    fg=self.accent_color,
-                    width=4
-                ).pack(side=tk.LEFT)
-                
-                # Damage (weapons only)
                 if stats.get('damage'):
-                    tk.Label(
-                        item_row,
-                        text=f"{stats['damage']:.1f}dmg",
-                        font=("Segoe UI", 8),
-                        bg="#24283b",
-                        fg="#9ece6a",
-                        width=7
-                    ).pack(side=tk.LEFT)
+                    tk.Label(item_row, text=f"{stats['damage']:.1f}dmg", font=("Segoe UI", 8), bg="#24283b", fg="#9ece6a", width=7).pack(side=tk.LEFT)
                 
-                # Masterwork price
                 if stats.get('mw_price'):
-                    from data import format_price
-                    tk.Label(
-                        item_row,
-                        text=f"MW:{format_price(stats['mw_price'])}",
-                        font=("Segoe UI", 8),
-                        bg="#24283b",
-                        fg="#FFD700",
-                        width=8
-                    ).pack(side=tk.LEFT)
-            
-            # Update ores list
-            for widget in self.ores_frame.winfo_children():
-                widget.destroy()
-            
-            for ore_id, ore_data in detected.items():
-                color = RARITY_COLORS.get(ore_data["rarity"], "#FFFFFF")
-                tk.Label(
-                    self.ores_frame,
-                    text=f"• {ore_data['name']} x{ore_data['count']}",
-                    font=("Segoe UI", 8),
-                    bg="#24283b",
-                    fg=color,
-                    anchor=tk.W
-                ).pack(fill=tk.X)
+                    tk.Label(item_row, text=f"MW:{format_price(stats['mw_price'])}", font=("Segoe UI", 8), bg="#24283b", fg="#FFD700", width=8).pack(side=tk.LEFT)
             
             # Update traits
             for widget in self.traits_frame.winfo_children():
@@ -360,35 +354,18 @@ class ForgerCompanion:
             
             for trait in result["traits"]:
                 if trait.get("source"):
-                    tk.Label(
-                        self.traits_frame,
-                        text=f"✦ {trait['text']}",
-                        font=("Segoe UI", 8),
-                        bg="#24283b",
-                        fg="#bb9af7",
-                        anchor=tk.W,
-                        wraplength=280
-                    ).pack(fill=tk.X)
-                    tk.Label(
-                        self.traits_frame,
-                        text=f"   ({trait['source']})",
-                        font=("Segoe UI", 7),
-                        bg="#24283b",
-                        fg=self.dim_color,
-                        anchor=tk.W
-                    ).pack(fill=tk.X)
+                    tk.Label(self.traits_frame, text=f"✦ {trait['text']}", font=("Segoe UI", 8), bg="#24283b", fg="#bb9af7", anchor=tk.W, wraplength=300).pack(fill=tk.X)
+                    tk.Label(self.traits_frame, text=f"   ({trait['source']})", font=("Segoe UI", 7), bg="#24283b", fg=self.dim_color, anchor=tk.W).pack(fill=tk.X)
                 else:
-                    tk.Label(
-                        self.traits_frame,
-                        text=trait['text'],
-                        font=("Segoe UI", 8),
-                        bg="#24283b",
-                        fg=self.dim_color
-                    ).pack(fill=tk.X)
+                    tk.Label(self.traits_frame, text=trait['text'], font=("Segoe UI", 8), bg="#24283b", fg=self.dim_color).pack(fill=tk.X)
         else:
             self.multiplier_label.config(text="--")
             self.rarity_label.config(text="--", fg="#FFFFFF")
-            self.masterwork_label.config(text="--")
+            self.total_ores_label.config(text="--")
+            self.best_item_label.config(text="Best: --")
+            self.best_damage_label.config(text="Damage: --")
+            self.best_mw_label.config(text="MW Price: --")
+            self.enh_damage_label.config(text="")
     
     def toggle_craft_type(self):
         if self.craft_type == "Weapon":
@@ -397,6 +374,39 @@ class ForgerCompanion:
         else:
             self.craft_type = "Weapon"
             self.craft_btn.config(text="⚔ Weapon")
+    
+    def increase_enhancement(self):
+        if self.enhancement_level < 9:
+            self.enhancement_level += 1
+            self.enh_label.config(text=f"+{self.enhancement_level}")
+            self.update_enhancement_display()
+    
+    def decrease_enhancement(self):
+        if self.enhancement_level > 0:
+            self.enhancement_level -= 1
+            self.enh_label.config(text=f"+{self.enhancement_level}")
+            self.update_enhancement_display()
+    
+    def update_enhancement_display(self):
+        """Update damage display with current enhancement level"""
+        if not self.last_result or self.craft_type != "Weapon":
+            return
+        
+        # Find best item
+        best_item = None
+        best_odds = 0
+        for item_type, stats in self.last_result['item_stats'].items():
+            if stats['odds'] > best_odds:
+                best_odds = stats['odds']
+                best_item = item_type
+                best_stats = stats
+        
+        if best_item and best_stats.get('damage'):
+            base_dmg = best_stats['damage']
+            enh_mult = 1 + (self.enhancement_level * 0.05)
+            enh_dmg = base_dmg * enh_mult
+            self.best_damage_label.config(text=f"Damage: {enh_dmg:.1f}")
+            self.enh_damage_label.config(text=f"(+{self.enhancement_level}: {enh_dmg:.1f})")
     
     def set_opacity(self, value):
         self.root.attributes("-alpha", float(value))
