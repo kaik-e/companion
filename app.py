@@ -1,7 +1,6 @@
 """Forger Companion - Overlay App with EasyOCR"""
 
 import tkinter as tk
-from tkinter import ttk
 import threading
 import time
 from ocr_scanner import scan_for_ores
@@ -13,15 +12,17 @@ class ForgerCompanion:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Forger Companion")
-        self.root.geometry("340x620")
+        self.root.geometry("400x520")
         self.root.attributes("-topmost", True)
-        self.root.attributes("-alpha", 0.9)
+        self.root.attributes("-alpha", 0.95)
+        self.root.resizable(True, True)
         
-        # Dark theme colors
-        self.bg_color = "#1a1b26"
-        self.fg_color = "#c0caf5"
-        self.accent_color = "#7aa2f7"
-        self.dim_color = "#565f89"
+        # Dark theme - matching forge result image
+        self.bg_color = "#0d0d0d"
+        self.fg_color = "#ffffff"
+        self.dim_color = "#9a9a9a"
+        self.gold_color = "#ffdb4a"
+        self.red_color = "#ff4444"
         
         self.root.configure(bg=self.bg_color)
         
@@ -30,229 +31,118 @@ class ForgerCompanion:
         self.scan_region = None
         self.detected_ores = {}
         self.craft_type = "Weapon"
-        self.opacity = 0.9
         self.enhancement_level = 0
         self.last_result = None
         
         self.setup_ui()
         
     def setup_ui(self):
-        # Title bar
-        title_frame = tk.Frame(self.root, bg=self.bg_color)
-        title_frame.pack(fill=tk.X, padx=5, pady=5)
+        # Controls bar at top
+        controls = tk.Frame(self.root, bg="#1a1a1a")
+        controls.pack(fill=tk.X, padx=10, pady=8)
         
-        tk.Label(
-            title_frame, 
-            text="⚒ Forger Companion", 
-            font=("Segoe UI", 11, "bold"),
-            bg=self.bg_color, 
-            fg=self.fg_color
-        ).pack(side=tk.LEFT)
-        
-        # Controls frame
-        controls = tk.Frame(self.root, bg=self.bg_color)
-        controls.pack(fill=tk.X, padx=5, pady=2)
-        
-        # Scan button
-        self.scan_btn = tk.Button(
-            controls,
-            text="▶ Start Scan",
-            command=self.toggle_scan,
-            bg=self.accent_color,
-            fg="white",
-            font=("Segoe UI", 9),
-            relief=tk.FLAT,
-            padx=10
-        )
+        self.scan_btn = tk.Button(controls, text="▶ Scan", command=self.toggle_scan, bg="#2d5a2d", fg="white", font=("Arial", 9, "bold"), relief=tk.FLAT, padx=12, pady=2)
         self.scan_btn.pack(side=tk.LEFT, padx=2)
         
-        # Set region button
-        tk.Button(
-            controls,
-            text="📐 Region",
-            command=self.set_region,
-            bg="#414868",
-            fg=self.fg_color,
-            font=("Segoe UI", 9),
-            relief=tk.FLAT,
-            padx=10
-        ).pack(side=tk.LEFT, padx=2)
+        tk.Button(controls, text="Region", command=self.set_region, bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=8, pady=2).pack(side=tk.LEFT, padx=2)
         
-        # Craft type toggle
-        self.craft_btn = tk.Button(
-            controls,
-            text="⚔ Weapon",
-            command=self.toggle_craft_type,
-            bg="#414868",
-            fg=self.fg_color,
-            font=("Segoe UI", 9),
-            relief=tk.FLAT,
-            padx=10
-        )
+        self.craft_btn = tk.Button(controls, text="Weapon", command=self.toggle_craft_type, bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=8, pady=2)
         self.craft_btn.pack(side=tk.LEFT, padx=2)
         
-        # Opacity slider
-        opacity_frame = tk.Frame(self.root, bg=self.bg_color)
-        opacity_frame.pack(fill=tk.X, padx=5, pady=2)
+        # Enhancement controls
+        tk.Button(controls, text="-", command=self.decrease_enhancement, bg="#333", fg="#ccc", font=("Arial", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.RIGHT, padx=1)
+        self.enh_label = tk.Label(controls, text="+0", font=("Arial", 10, "bold"), bg="#1a1a1a", fg="#ff9e64", width=3)
+        self.enh_label.pack(side=tk.RIGHT)
+        tk.Button(controls, text="+", command=self.increase_enhancement, bg="#333", fg="#ccc", font=("Arial", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.RIGHT, padx=1)
+        tk.Label(controls, text="Enh:", font=("Arial", 8), bg="#1a1a1a", fg="#666").pack(side=tk.RIGHT, padx=4)
         
-        tk.Label(
-            opacity_frame,
-            text="Opacity:",
-            bg=self.bg_color,
-            fg=self.dim_color,
-            font=("Segoe UI", 8)
-        ).pack(side=tk.LEFT)
+        # Main content area
+        self.content = tk.Frame(self.root, bg=self.bg_color)
+        self.content.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        self.opacity_slider = tk.Scale(
-            opacity_frame,
-            from_=0.3,
-            to=1.0,
-            resolution=0.05,
-            orient=tk.HORIZONTAL,
-            command=self.set_opacity,
-            bg=self.bg_color,
-            fg=self.fg_color,
-            highlightthickness=0,
-            troughcolor="#414868",
-            length=150
-        )
-        self.opacity_slider.set(0.9)
-        self.opacity_slider.pack(side=tk.LEFT, padx=5)
-        
-        # Status
-        self.status_label = tk.Label(
-            self.root,
-            text="Ready - Click Start Scan",
-            bg=self.bg_color,
-            fg=self.dim_color,
-            font=("Segoe UI", 8)
-        )
-        self.status_label.pack(fill=tk.X, padx=5)
-        
-        # Results frame
-        results_container = tk.Frame(self.root, bg="#24283b")
-        results_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # === MAIN RESULT SECTION ===
-        main_result_frame = tk.Frame(results_container, bg="#1f2335")
-        main_result_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        # Top row: Multiplier | Rarity | Total Ores
-        stats_frame = tk.Frame(main_result_frame, bg="#1f2335")
-        stats_frame.pack(fill=tk.X, padx=5, pady=3)
-        
-        # Multiplier
-        mult_frame = tk.Frame(stats_frame, bg="#1f2335")
-        mult_frame.pack(side=tk.LEFT, expand=True)
-        self.multiplier_label = tk.Label(mult_frame, text="--", font=("Segoe UI", 18, "bold"), bg="#1f2335", fg=self.accent_color)
+        # === MULTI LABEL ===
+        tk.Label(self.content, text="MULTI", font=("Arial", 9), bg=self.bg_color, fg=self.dim_color).pack()
+        self.multiplier_label = tk.Label(self.content, text="0.00x", font=("Arial", 28, "bold"), bg=self.bg_color, fg=self.fg_color)
         self.multiplier_label.pack()
-        tk.Label(mult_frame, text="Multiplier", font=("Segoe UI", 7), bg="#1f2335", fg=self.dim_color).pack()
         
-        # Rarity
-        rarity_frame = tk.Frame(stats_frame, bg="#1f2335")
-        rarity_frame.pack(side=tk.LEFT, expand=True)
-        self.rarity_label = tk.Label(rarity_frame, text="--", font=("Segoe UI", 11, "bold"), bg="#1f2335", fg="#FFFFFF")
-        self.rarity_label.pack()
-        tk.Label(rarity_frame, text="Rarity", font=("Segoe UI", 7), bg="#1f2335", fg=self.dim_color).pack()
+        # === ORE BOXES ===
+        self.ores_frame = tk.Frame(self.content, bg=self.bg_color)
+        self.ores_frame.pack(pady=10)
         
-        # Total Ores
-        ores_count_frame = tk.Frame(stats_frame, bg="#1f2335")
-        ores_count_frame.pack(side=tk.LEFT, expand=True)
-        self.total_ores_label = tk.Label(ores_count_frame, text="--", font=("Segoe UI", 11, "bold"), bg="#1f2335", fg="#FFD700")
-        self.total_ores_label.pack()
-        tk.Label(ores_count_frame, text="Total Ores", font=("Segoe UI", 7), bg="#1f2335", fg=self.dim_color).pack()
+        # Create 4 ore slot frames
+        self.ore_slots = []
+        for i in range(4):
+            slot = tk.Frame(self.ores_frame, bg="#1a1a1a", width=80, height=80, highlightbackground="#444", highlightthickness=2)
+            slot.pack(side=tk.LEFT, padx=5)
+            slot.pack_propagate(False)
+            
+            name_lbl = tk.Label(slot, text="Empty", font=("Arial", 9, "bold"), bg="#1a1a1a", fg="#444")
+            name_lbl.pack(pady=(8, 0))
+            
+            amt_lbl = tk.Label(slot, text="", font=("Arial", 14, "bold"), bg="#1a1a1a", fg="white")
+            amt_lbl.pack(expand=True)
+            
+            pct_lbl = tk.Label(self.ores_frame, text="", font=("Arial", 12, "bold"), bg=self.bg_color, fg="white")
+            
+            self.ore_slots.append({"frame": slot, "name": name_lbl, "amount": amt_lbl, "pct": pct_lbl})
         
-        # === HIGHEST % WEAPON/ARMOR ===
-        tk.Frame(main_result_frame, bg=self.dim_color, height=1).pack(fill=tk.X, padx=5, pady=3)
+        # Percentage labels below boxes
+        self.pct_frame = tk.Frame(self.content, bg=self.bg_color)
+        self.pct_frame.pack()
+        for i in range(4):
+            lbl = tk.Label(self.pct_frame, text="", font=("Arial", 12, "bold"), bg=self.bg_color, fg="white", width=8)
+            lbl.pack(side=tk.LEFT, padx=5)
+            self.ore_slots[i]["pct"] = lbl
         
-        self.best_item_frame = tk.Frame(main_result_frame, bg="#1f2335")
-        self.best_item_frame.pack(fill=tk.X, padx=5, pady=3)
+        # === WEAPON RESULT ===
+        self.weapon_frame = tk.Frame(self.content, bg=self.bg_color)
+        self.weapon_frame.pack(pady=(15, 5))
         
-        self.best_item_label = tk.Label(self.best_item_frame, text="Best: --", font=("Segoe UI", 10, "bold"), bg="#1f2335", fg=self.fg_color)
-        self.best_item_label.pack(anchor=tk.W)
+        self.weapon_name_label = tk.Label(self.weapon_frame, text="", font=("Arial", 18, "bold"), bg=self.bg_color, fg="white")
+        self.weapon_name_label.pack()
         
-        self.best_damage_label = tk.Label(self.best_item_frame, text="Damage: --", font=("Segoe UI", 9), bg="#1f2335", fg="#9ece6a")
-        self.best_damage_label.pack(anchor=tk.W)
+        self.weapon_stats_label = tk.Label(self.weapon_frame, text="", font=("Arial", 11, "bold"), bg=self.bg_color, fg=self.gold_color)
+        self.weapon_stats_label.pack()
         
-        self.best_mw_label = tk.Label(self.best_item_frame, text="MW Price: --", font=("Segoe UI", 9), bg="#1f2335", fg="#FFD700")
-        self.best_mw_label.pack(anchor=tk.W)
+        # === WEAPON TRAITS ===
+        self.weapon_traits_label = tk.Label(self.content, text="", font=("Arial", 9), bg=self.bg_color, fg="#ccc", wraplength=380)
+        self.weapon_traits_label.pack(pady=2)
         
-        # === ENHANCEMENT CONTROLS ===
-        tk.Frame(main_result_frame, bg=self.dim_color, height=1).pack(fill=tk.X, padx=5, pady=3)
+        # === ARMOR RESULT ===
+        self.armor_frame = tk.Frame(self.content, bg=self.bg_color)
+        self.armor_frame.pack(pady=(10, 5))
         
-        enh_frame = tk.Frame(main_result_frame, bg="#1f2335")
-        enh_frame.pack(fill=tk.X, padx=5, pady=3)
+        self.armor_name_label = tk.Label(self.armor_frame, text="", font=("Arial", 18, "bold"), bg=self.bg_color, fg="white")
+        self.armor_name_label.pack()
         
-        tk.Label(enh_frame, text="Enhancement:", font=("Segoe UI", 9), bg="#1f2335", fg=self.fg_color).pack(side=tk.LEFT)
+        self.armor_stats_label = tk.Label(self.armor_frame, text="", font=("Arial", 11, "bold"), bg=self.bg_color, fg=self.gold_color)
+        self.armor_stats_label.pack()
         
-        tk.Button(enh_frame, text="-", command=self.decrease_enhancement, bg="#414868", fg=self.fg_color, font=("Segoe UI", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.LEFT, padx=2)
+        # === ARMOR TRAITS ===
+        self.armor_traits_label = tk.Label(self.content, text="", font=("Arial", 9), bg=self.bg_color, fg="#ccc", wraplength=380)
+        self.armor_traits_label.pack(pady=2)
         
-        self.enh_label = tk.Label(enh_frame, text="+0", font=("Segoe UI", 10, "bold"), bg="#1f2335", fg="#ff9e64", width=3)
-        self.enh_label.pack(side=tk.LEFT, padx=2)
+        # Status bar at bottom
+        self.status_label = tk.Label(self.root, text="Click Scan to start", font=("Arial", 8), bg="#1a1a1a", fg="#666", anchor=tk.W)
+        self.status_label.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
         
-        tk.Button(enh_frame, text="+", command=self.increase_enhancement, bg="#414868", fg=self.fg_color, font=("Segoe UI", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.LEFT, padx=2)
-        
-        # Enhanced damage display
-        self.enh_damage_label = tk.Label(enh_frame, text="", font=("Segoe UI", 9), bg="#1f2335", fg="#9ece6a")
-        self.enh_damage_label.pack(side=tk.LEFT, padx=10)
-        
-        # === ORE COMPOSITION ===
-        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=3)
-        
-        tk.Label(results_container, text="Ore Composition", font=("Segoe UI", 9, "bold"), bg="#24283b", fg=self.fg_color).pack(anchor=tk.W, padx=10)
-        
-        self.ores_frame = tk.Frame(results_container, bg="#24283b")
-        self.ores_frame.pack(fill=tk.X, padx=10, pady=2)
-        
-        # === ITEM ODDS ===
-        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=3)
-        
-        tk.Label(results_container, text="Item Odds", font=("Segoe UI", 9, "bold"), bg="#24283b", fg=self.fg_color).pack(anchor=tk.W, padx=10)
-        
-        self.items_frame = tk.Frame(results_container, bg="#24283b")
-        self.items_frame.pack(fill=tk.X, padx=10, pady=2)
-        
-        # === TRAITS ===
-        tk.Frame(results_container, bg=self.dim_color, height=1).pack(fill=tk.X, padx=10, pady=3)
-        
-        tk.Label(results_container, text="Traits", font=("Segoe UI", 9, "bold"), bg="#24283b", fg=self.fg_color).pack(anchor=tk.W, padx=10)
-        
-        self.traits_frame = tk.Frame(results_container, bg="#24283b")
-        self.traits_frame.pack(fill=tk.X, padx=10, pady=2)
-        
-        # Debug text
+        # Debug (hidden by default)
         self.debug_frame = tk.Frame(self.root, bg=self.bg_color)
-        self.debug_text = tk.Text(
-            self.debug_frame,
-            height=3,
-            bg="#1f2335",
-            fg=self.dim_color,
-            font=("Consolas", 8),
-            wrap=tk.WORD
-        )
-        self.debug_text.pack(fill=tk.X, padx=5, pady=2)
-        
-        # Debug toggle
+        self.debug_text = tk.Text(self.debug_frame, height=2, bg="#111", fg="#666", font=("Consolas", 8), wrap=tk.WORD)
+        self.debug_text.pack(fill=tk.X, padx=5)
         self.debug_visible = False
-        debug_btn = tk.Button(
-            self.root,
-            text="Show Debug",
-            command=self.toggle_debug,
-            bg=self.bg_color,
-            fg=self.dim_color,
-            font=("Segoe UI", 8),
-            relief=tk.FLAT
-        )
-        debug_btn.pack(pady=2)
+        
+        # Right-click to toggle debug
+        self.root.bind("<Button-3>", lambda e: self.toggle_debug())
         
     def toggle_scan(self):
         self.scanning = not self.scanning
         if self.scanning:
-            self.scan_btn.config(text="⏸ Stop", bg="#f7768e")
+            self.scan_btn.config(text="⏸ Stop", bg="#5a2d2d")
             self.status_label.config(text="Scanning...")
             threading.Thread(target=self.scan_loop, daemon=True).start()
         else:
-            self.scan_btn.config(text="▶ Start Scan", bg=self.accent_color)
+            self.scan_btn.config(text="▶ Scan", bg="#2d5a2d")
             self.status_label.config(text="Stopped")
     
     def scan_loop(self):
@@ -277,103 +167,110 @@ class ForgerCompanion:
         # Update status
         self.status_label.config(text=f"Found {len(detected)} ores")
         
-        # Calculate forge
-        result = calculate_forge(detected, self.craft_type)
-        self.last_result = result
+        # Calculate BOTH weapon and armor results
+        weapon_result = calculate_forge(detected, "Weapon")
+        armor_result = calculate_forge(detected, "Armor")
+        self.last_result = weapon_result  # Store for enhancement updates
         
-        if result:
-            # Update top stats
-            self.multiplier_label.config(text=f"{result['multiplier']}x")
-            self.rarity_label.config(text=result['rarity'], fg=result['rarity_color'])
-            self.total_ores_label.config(text=f"{result['total_ores']}")
-            
-            # Find best item (highest odds)
-            best_item = None
-            best_odds = 0
-            for item_type, stats in result['item_stats'].items():
-                if stats['odds'] > best_odds:
-                    best_odds = stats['odds']
-                    best_item = item_type
-                    best_stats = stats
-            
-            if best_item:
-                self.best_item_label.config(text=f"Best: {best_item} ({int(best_odds * 100)}%)")
-                
-                # Calculate damage with enhancement
-                if self.craft_type == "Weapon" and best_stats.get('damage'):
-                    base_dmg = best_stats['damage']
-                    enh_mult = 1 + (self.enhancement_level * 0.05)
-                    enh_dmg = base_dmg * enh_mult
-                    self.best_damage_label.config(text=f"Damage: {enh_dmg:.1f}")
-                    self.enh_damage_label.config(text=f"(+{self.enhancement_level}: {enh_dmg:.1f})")
-                else:
-                    self.best_damage_label.config(text="")
-                    self.enh_damage_label.config(text="")
-                
-                if best_stats.get('mw_price'):
-                    self.best_mw_label.config(text=f"MW Price: {format_price(best_stats['mw_price'])}")
-                else:
-                    self.best_mw_label.config(text="")
-            
-            # Update ore composition with %
-            for widget in self.ores_frame.winfo_children():
-                widget.destroy()
-            
-            for ore_name, pct in result['composition'].items():
+        if not weapon_result:
+            self.multiplier_label.config(text="0.00x")
+            self.clear_display()
+            return
+        
+        # Update multiplier
+        self.multiplier_label.config(text=f"{weapon_result['multiplier']:.2f}x")
+        
+        # Update ore slots (up to 4)
+        ore_list = list(weapon_result['composition'].items())
+        for i in range(4):
+            slot = self.ore_slots[i]
+            if i < len(ore_list):
+                ore_name, pct = ore_list[i]
                 ore_data = ORES.get(ore_name, {})
-                color = RARITY_COLORS.get(ore_data.get("rarity"), "#FFFFFF")
+                rarity = ore_data.get("rarity", "Common")
+                color = RARITY_COLORS.get(rarity, "#808080")
                 
-                ore_row = tk.Frame(self.ores_frame, bg="#24283b")
-                ore_row.pack(fill=tk.X, pady=1)
+                # Get amount from detected
+                amount = detected.get(ore_name, {}).get("count", 0)
                 
-                tk.Label(ore_row, text=f"{pct:.1f}%", font=("Segoe UI", 8, "bold"), bg="#24283b", fg=self.accent_color, width=6).pack(side=tk.LEFT)
-                tk.Label(ore_row, text=ore_name, font=("Segoe UI", 8), bg="#24283b", fg=color, anchor=tk.W).pack(side=tk.LEFT)
+                # Update slot
+                display_name = ore_name.replace(" Ore", "").replace(" Crystal", "")
+                slot["name"].config(text=display_name, fg="white")
+                slot["amount"].config(text=f"{amount}x")
+                slot["frame"].config(highlightbackground=color)
+                slot["pct"].config(text=f"{pct:.0f}%")
+            else:
+                # Empty slot
+                slot["name"].config(text="Empty", fg="#444")
+                slot["amount"].config(text="")
+                slot["frame"].config(highlightbackground="#444")
+                slot["pct"].config(text="")
+        
+        # Find top weapon
+        top_weapon = None
+        top_weapon_odds = 0
+        for item, stats in weapon_result['item_stats'].items():
+            if stats['odds'] > top_weapon_odds:
+                top_weapon_odds = stats['odds']
+                top_weapon = item
+                top_weapon_stats = stats
+        
+        # Find top armor
+        top_armor = None
+        top_armor_odds = 0
+        for item, stats in armor_result['item_stats'].items():
+            if stats['odds'] > top_armor_odds:
+                top_armor_odds = stats['odds']
+                top_armor = item
+                top_armor_stats = stats
+        
+        # Update weapon display
+        if top_weapon:
+            enh_mult = 1 + (self.enhancement_level * 0.05)
+            base_dmg = top_weapon_stats.get('damage', 0) or 0
+            enh_dmg = base_dmg * enh_mult
+            mw_price = top_weapon_stats.get('mw_price', 0) or 0
             
-            # Update item odds
-            for widget in self.items_frame.winfo_children():
-                widget.destroy()
+            self.weapon_name_label.config(text=f"{top_weapon} ({int(top_weapon_odds * 100)}%)")
             
-            for item_type, stats in result['item_stats'].items():
-                pct = int(stats['odds'] * 100)
-                
-                item_row = tk.Frame(self.items_frame, bg="#24283b")
-                item_row.pack(fill=tk.X, pady=1)
-                
-                tk.Label(item_row, text=f"{item_type}", font=("Segoe UI", 8), bg="#24283b", fg=self.fg_color, anchor=tk.W, width=14).pack(side=tk.LEFT)
-                tk.Label(item_row, text=f"{pct}%", font=("Segoe UI", 8, "bold"), bg="#24283b", fg=self.accent_color, width=4).pack(side=tk.LEFT)
-                
-                if stats.get('damage'):
-                    tk.Label(item_row, text=f"{stats['damage']:.1f}dmg", font=("Segoe UI", 8), bg="#24283b", fg="#9ece6a", width=7).pack(side=tk.LEFT)
-                
-                if stats.get('mw_price'):
-                    tk.Label(item_row, text=f"MW:{format_price(stats['mw_price'])}", font=("Segoe UI", 8), bg="#24283b", fg="#FFD700", width=8).pack(side=tk.LEFT)
-            
-            # Update traits
-            for widget in self.traits_frame.winfo_children():
-                widget.destroy()
-            
-            for trait in result["traits"]:
-                if trait.get("source"):
-                    tk.Label(self.traits_frame, text=f"✦ {trait['text']}", font=("Segoe UI", 8), bg="#24283b", fg="#bb9af7", anchor=tk.W, wraplength=300).pack(fill=tk.X)
-                    tk.Label(self.traits_frame, text=f"   ({trait['source']})", font=("Segoe UI", 7), bg="#24283b", fg=self.dim_color, anchor=tk.W).pack(fill=tk.X)
-                else:
-                    tk.Label(self.traits_frame, text=trait['text'], font=("Segoe UI", 8), bg="#24283b", fg=self.dim_color).pack(fill=tk.X)
-        else:
-            self.multiplier_label.config(text="--")
-            self.rarity_label.config(text="--", fg="#FFFFFF")
-            self.total_ores_label.config(text="--")
-            self.best_item_label.config(text="Best: --")
-            self.best_damage_label.config(text="Damage: --")
-            self.best_mw_label.config(text="MW Price: --")
-            self.enh_damage_label.config(text="")
+            enh_text = f" (+{self.enhancement_level})" if self.enhancement_level > 0 else ""
+            stats_text = f"Masterwork {mw_price:,}$  •  {enh_dmg:.2f} DMG{enh_text}"
+            self.weapon_stats_label.config(text=stats_text)
+        
+        # Weapon traits
+        weapon_traits = [t['text'] for t in weapon_result['traits'] if t.get('source')]
+        self.weapon_traits_label.config(text="  |  ".join(weapon_traits) if weapon_traits else "")
+        
+        # Update armor display
+        if top_armor:
+            mw_price = top_armor_stats.get('mw_price', 0) or 0
+            self.armor_name_label.config(text=f"{top_armor} ({int(top_armor_odds * 100)}%)")
+            self.armor_stats_label.config(text=f"Masterwork {mw_price:,}$")
+        
+        # Armor traits
+        armor_traits = [t['text'] for t in armor_result['traits'] if t.get('source')]
+        self.armor_traits_label.config(text="  |  ".join(armor_traits) if armor_traits else "")
+    
+    def clear_display(self):
+        for slot in self.ore_slots:
+            slot["name"].config(text="Empty", fg="#444")
+            slot["amount"].config(text="")
+            slot["frame"].config(highlightbackground="#444")
+            slot["pct"].config(text="")
+        self.weapon_name_label.config(text="")
+        self.weapon_stats_label.config(text="")
+        self.weapon_traits_label.config(text="")
+        self.armor_name_label.config(text="")
+        self.armor_stats_label.config(text="")
+        self.armor_traits_label.config(text="")
     
     def toggle_craft_type(self):
         if self.craft_type == "Weapon":
             self.craft_type = "Armor"
-            self.craft_btn.config(text="🛡 Armor")
+            self.craft_btn.config(text="Armor")
         else:
             self.craft_type = "Weapon"
-            self.craft_btn.config(text="⚔ Weapon")
+            self.craft_btn.config(text="Weapon")
     
     def increase_enhancement(self):
         if self.enhancement_level < 9:
@@ -389,10 +286,10 @@ class ForgerCompanion:
     
     def update_enhancement_display(self):
         """Update damage display with current enhancement level"""
-        if not self.last_result or self.craft_type != "Weapon":
+        if not self.last_result:
             return
         
-        # Find best item
+        # Find best weapon
         best_item = None
         best_odds = 0
         for item_type, stats in self.last_result['item_stats'].items():
@@ -405,16 +302,16 @@ class ForgerCompanion:
             base_dmg = best_stats['damage']
             enh_mult = 1 + (self.enhancement_level * 0.05)
             enh_dmg = base_dmg * enh_mult
-            self.best_damage_label.config(text=f"Damage: {enh_dmg:.1f}")
-            self.enh_damage_label.config(text=f"(+{self.enhancement_level}: {enh_dmg:.1f})")
-    
-    def set_opacity(self, value):
-        self.root.attributes("-alpha", float(value))
+            mw_price = best_stats.get('mw_price', 0) or 0
+            
+            enh_text = f" (+{self.enhancement_level})" if self.enhancement_level > 0 else ""
+            stats_text = f"Masterwork {mw_price:,}$  •  {enh_dmg:.2f} DMG{enh_text}"
+            self.weapon_stats_label.config(text=stats_text)
     
     def set_region(self):
         """Open region selector"""
         self.scanning = False
-        self.scan_btn.config(text="▶ Start Scan", bg=self.accent_color)
+        self.scan_btn.config(text="▶ Scan", bg="#2d5a2d")
         
         selector = RegionSelector(self.root, self.on_region_selected)
         
