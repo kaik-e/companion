@@ -474,7 +474,7 @@ class ForgerCompanion:
                                            bg=self.bg_color, fg=FG_WHITE)
         self.macro_status_label.pack(pady=(0, 5))
         
-        self.macro_detail_label = tk.Label(content, text="Configure in Settings → Macro", font=("Arial", 10), 
+        self.macro_detail_label = tk.Label(content, text="Press F6 or ESC to stop", font=("Arial", 10), 
                                            bg=self.bg_color, fg=FG_DIM)
         self.macro_detail_label.pack(pady=(0, 30))
         
@@ -530,7 +530,15 @@ class ForgerCompanion:
     
     def on_macro_status(self, status):
         """Called when macro status changes"""
-        self.root.after(0, lambda: self.macro_status_label.config(text=status))
+        def update_ui():
+            self.macro_status_label.config(text=status)
+            # Update button state if macro stopped
+            if "stopped" in status.lower() or not self.macro_controller.running:
+                self.macro_btn.text = "▶ Start Macro"
+                self.macro_btn.bg_normal = BG_PRIMARY
+                self.macro_btn.draw_button(BG_PRIMARY)
+                self.macro_status_indicator.config(fg="#666")
+        self.root.after(0, update_ui)
     
     def setup_calc_page(self):
         """Setup the calculator page (auto-detection)"""
