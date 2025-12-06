@@ -70,26 +70,18 @@ class INPUT(ctypes.Structure):
 
 
 def click_at(x, y):
-    """Click at specific screen coordinates using SendInput"""
-    # Move mouse
+    """Click at specific screen coordinates"""
+    # Move mouse first
     user32.SetCursorPos(x, y)
-    time.sleep(0.1)
+    time.sleep(0.2)  # Wait for mouse to settle
     
-    # Use SendInput for more reliable clicking
-    # Create mouse down input
-    inputs = (INPUT * 2)()
+    # Click down
+    user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+    time.sleep(0.1)  # Hold for a moment
     
-    # Mouse down
-    inputs[0].type = INPUT_MOUSE
-    inputs[0]._input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN
-    
-    # Mouse up
-    inputs[1].type = INPUT_MOUSE
-    inputs[1]._input.mi.dwFlags = MOUSEEVENTF_LEFTUP
-    
-    # Send the inputs
-    user32.SendInput(2, ctypes.byref(inputs), ctypes.sizeof(INPUT))
-    time.sleep(0.05)
+    # Click up
+    user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+    time.sleep(0.1)  # Wait after click
 
 
 def hold_click(duration_seconds):
