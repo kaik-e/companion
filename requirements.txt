@@ -2,4 +2,3 @@ easyocr
 mss
 pillow
 numpy
-tkinter-tooltip

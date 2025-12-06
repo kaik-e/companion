@@ -206,10 +206,10 @@ class ForgerCompanion:
                 self.detected_ores = detected
                 
                 # Update UI in main thread
-                self.root.after(0, lambda: self.update_results(detected, raw_text))
+                self.root.after(0, lambda d=detected, r=raw_text: self.update_results(d, r))
                 
             except Exception as e:
-                self.root.after(0, lambda: self.status_label.config(text=f"Error: {e}"))
+                self.root.after(0, lambda err=str(e): self.status_label.config(text=f"Error: {err}"))
             
             time.sleep(2)  # Scan every 2 seconds
     
