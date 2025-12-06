@@ -26,6 +26,8 @@ for ore_name in ORES.keys():
 
 # Special patterns for OCR misreads
 ORE_PATTERNS["eye"] = "Eye Ore"
+ORE_PATTERNS["eve"] = "Eye Ore"
+ORE_PATTERNS["eve ore"] = "Eye Ore"
 ORE_PATTERNS["mythri"] = "Mythril Ore"
 ORE_PATTERNS["rival"] = "Rivalite Ore"
 ORE_PATTERNS["topa"] = "Topaz Ore"
