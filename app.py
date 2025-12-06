@@ -161,11 +161,16 @@ class ForgerCompanion:
         
         self.root.configure(bg=self.bg_color)
         
+        # Load saved settings
+        from config import load_settings, get_region
+        self.settings = load_settings()
+        
         # State
         self.scanning = False
-        self.auto_mode = True  # Auto-detect forge UI
+        self.auto_mode = self.settings.get("preferences", {}).get("auto_mode", True)
         self.forge_ui_visible = False
-        self.scan_region = None
+        self.scan_region = get_region("forge_slots")  # Use saved region
+        self.ores_region = get_region("ores_panel")   # For ore inventory
         self.detected_ores = {}
         self.craft_type = "Weapon"
         self.enhancement_level = 0
@@ -192,7 +197,8 @@ class ForgerCompanion:
         self.scan_btn = tk.Button(controls, text="▶ Scan", command=self.toggle_scan, bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=12, pady=2)
         self.scan_btn.pack(side=tk.LEFT, padx=2)
         
-        tk.Button(controls, text="Region", command=self.set_region, bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=8, pady=2).pack(side=tk.LEFT, padx=2)
+        # Settings button (gear icon)
+        tk.Button(controls, text="⚙", command=self.open_settings, bg="#333", fg="#ccc", font=("Arial", 10), relief=tk.FLAT, width=3, pady=2).pack(side=tk.LEFT, padx=2)
         
         # Enhancement controls
         tk.Button(controls, text="-", command=self.decrease_enhancement, bg="#333", fg="#ccc", font=("Arial", 9, "bold"), width=2, relief=tk.FLAT).pack(side=tk.RIGHT, padx=1)
@@ -515,23 +521,6 @@ class ForgerCompanion:
             stats_text = f"Masterwork {mw_price:,}$  •  {enh_dmg:.2f} DMG{enh_text}"
             self.weapon_stats_label.config(text=stats_text)
     
-    def set_region(self):
-        """Open region selector"""
-        self.scanning = False
-        self.scan_btn.config(text="▶ Scan", bg="#2d5a2d")
-        
-        selector = RegionSelector(self.root, self.on_region_selected)
-        
-    def on_region_selected(self, region):
-        if region:
-            self.scan_region = region
-            self.status_label.config(
-                text=f"Region: {region['width']}x{region['height']} at ({region['x']}, {region['y']})"
-            )
-        else:
-            self.scan_region = None
-            self.status_label.config(text="Using full screen")
-    
     def toggle_debug(self):
         self.debug_visible = not self.debug_visible
         if self.debug_visible:
@@ -539,8 +528,225 @@ class ForgerCompanion:
         else:
             self.debug_frame.pack_forget()
     
+    def open_settings(self):
+        """Open settings window"""
+        SettingsWindow(self.root, self.on_settings_changed)
+    
+    def on_settings_changed(self):
+        """Called when settings are updated"""
+        from config import load_settings, get_region
+        self.settings = load_settings()
+        self.scan_region = get_region("forge_slots")
+        self.ores_region = get_region("ores_panel")
+        self.status_label.config(text="Settings updated")
+    
     def run(self):
         self.root.mainloop()
+
+
+class SettingsWindow:
+    """Settings configuration window"""
+    
+    def __init__(self, parent, on_save):
+        self.parent = parent
+        self.on_save = on_save
+        
+        self.window = tk.Toplevel(parent)
+        self.window.title("Settings")
+        self.window.geometry("400x450")
+        self.window.resizable(False, False)
+        self.window.configure(bg="#0d0d0d")
+        self.window.transient(parent)
+        self.window.grab_set()
+        
+        # Center on parent
+        self.window.geometry(f"+{parent.winfo_x() + 50}+{parent.winfo_y() + 50}")
+        
+        self.setup_ui()
+    
+    def setup_ui(self):
+        from config import load_settings, get_region
+        self.settings = load_settings()
+        
+        # Title
+        tk.Label(
+            self.window,
+            text="⚙ Settings",
+            font=("Arial", 16, "bold"),
+            bg="#0d0d0d",
+            fg="#ffffff"
+        ).pack(pady=(20, 15))
+        
+        # === REGIONS SECTION ===
+        regions_frame = tk.LabelFrame(
+            self.window,
+            text=" Screen Regions ",
+            font=("Arial", 10, "bold"),
+            bg="#0d0d0d",
+            fg="#9a9a9a",
+            padx=15,
+            pady=10
+        )
+        regions_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        # Forge Slots region
+        slots_frame = tk.Frame(regions_frame, bg="#0d0d0d")
+        slots_frame.pack(fill=tk.X, pady=5)
+        
+        tk.Label(slots_frame, text="Forge Slots:", font=("Arial", 10), bg="#0d0d0d", fg="#ccc", width=12, anchor=tk.W).pack(side=tk.LEFT)
+        
+        slots_region = get_region("forge_slots")
+        slots_text = f"{slots_region['width']}x{slots_region['height']}" if slots_region else "Not set"
+        self.slots_label = tk.Label(slots_frame, text=slots_text, font=("Arial", 9), bg="#0d0d0d", fg="#4ade80" if slots_region else "#666", width=12)
+        self.slots_label.pack(side=tk.LEFT)
+        
+        tk.Button(slots_frame, text="Set", command=lambda: self.set_region("forge_slots"), bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=10).pack(side=tk.RIGHT)
+        
+        # Ores Panel region
+        ores_frame = tk.Frame(regions_frame, bg="#0d0d0d")
+        ores_frame.pack(fill=tk.X, pady=5)
+        
+        tk.Label(ores_frame, text="Ores Panel:", font=("Arial", 10), bg="#0d0d0d", fg="#ccc", width=12, anchor=tk.W).pack(side=tk.LEFT)
+        
+        ores_region = get_region("ores_panel")
+        ores_text = f"{ores_region['width']}x{ores_region['height']}" if ores_region else "Not set"
+        self.ores_label = tk.Label(ores_frame, text=ores_text, font=("Arial", 9), bg="#0d0d0d", fg="#4ade80" if ores_region else "#666", width=12)
+        self.ores_label.pack(side=tk.LEFT)
+        
+        tk.Button(ores_frame, text="Set", command=lambda: self.set_region("ores_panel"), bg="#333", fg="#ccc", font=("Arial", 9), relief=tk.FLAT, padx=10).pack(side=tk.RIGHT)
+        
+        # === PREFERENCES SECTION ===
+        prefs_frame = tk.LabelFrame(
+            self.window,
+            text=" Preferences ",
+            font=("Arial", 10, "bold"),
+            bg="#0d0d0d",
+            fg="#9a9a9a",
+            padx=15,
+            pady=10
+        )
+        prefs_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        # Auto mode
+        self.auto_var = tk.BooleanVar(value=self.settings.get("preferences", {}).get("auto_mode", True))
+        tk.Checkbutton(
+            prefs_frame,
+            text="Auto-detect Forge UI",
+            variable=self.auto_var,
+            font=("Arial", 10),
+            bg="#0d0d0d",
+            fg="#ccc",
+            selectcolor="#1a1a1a",
+            activebackground="#0d0d0d",
+            activeforeground="#ccc"
+        ).pack(anchor=tk.W, pady=2)
+        
+        # Always on top
+        self.topmost_var = tk.BooleanVar(value=self.settings.get("preferences", {}).get("always_on_top", True))
+        tk.Checkbutton(
+            prefs_frame,
+            text="Always on top",
+            variable=self.topmost_var,
+            font=("Arial", 10),
+            bg="#0d0d0d",
+            fg="#ccc",
+            selectcolor="#1a1a1a",
+            activebackground="#0d0d0d",
+            activeforeground="#ccc"
+        ).pack(anchor=tk.W, pady=2)
+        
+        # === ACTIONS SECTION ===
+        actions_frame = tk.LabelFrame(
+            self.window,
+            text=" Actions ",
+            font=("Arial", 10, "bold"),
+            bg="#0d0d0d",
+            fg="#9a9a9a",
+            padx=15,
+            pady=10
+        )
+        actions_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        tk.Button(
+            actions_frame,
+            text="Run Setup Wizard Again",
+            command=self.run_setup_wizard,
+            bg="#333",
+            fg="#ccc",
+            font=("Arial", 10),
+            relief=tk.FLAT,
+            padx=15,
+            pady=5
+        ).pack(anchor=tk.W, pady=5)
+        
+        # === BUTTONS ===
+        btn_frame = tk.Frame(self.window, bg="#0d0d0d")
+        btn_frame.pack(fill=tk.X, padx=20, pady=20)
+        
+        tk.Button(
+            btn_frame,
+            text="Cancel",
+            command=self.window.destroy,
+            bg="#333",
+            fg="#ccc",
+            font=("Arial", 10),
+            relief=tk.FLAT,
+            padx=20,
+            pady=8
+        ).pack(side=tk.LEFT)
+        
+        tk.Button(
+            btn_frame,
+            text="Save",
+            command=self.save,
+            bg="#2d5a2d",
+            fg="#fff",
+            font=("Arial", 10, "bold"),
+            relief=tk.FLAT,
+            padx=25,
+            pady=8
+        ).pack(side=tk.RIGHT)
+    
+    def set_region(self, region_name):
+        """Open region selector for a specific region"""
+        self.window.withdraw()
+        
+        def on_selected(region):
+            self.window.deiconify()
+            if region:
+                from config import set_region
+                set_region(region_name, region)
+                
+                # Update label
+                text = f"{region['width']}x{region['height']}"
+                if region_name == "forge_slots":
+                    self.slots_label.config(text=text, fg="#4ade80")
+                elif region_name == "ores_panel":
+                    self.ores_label.config(text=text, fg="#4ade80")
+        
+        RegionSelector(self.parent, on_selected)
+    
+    def run_setup_wizard(self):
+        """Re-run the setup wizard"""
+        from config import reset_setup
+        reset_setup()
+        self.window.destroy()
+        
+        # Restart app to show wizard
+        import sys
+        import os
+        os.execv(sys.executable, ['python'] + sys.argv)
+    
+    def save(self):
+        """Save settings and close"""
+        from config import save_settings
+        
+        self.settings["preferences"]["auto_mode"] = self.auto_var.get()
+        self.settings["preferences"]["always_on_top"] = self.topmost_var.get()
+        save_settings(self.settings)
+        
+        self.on_save()
+        self.window.destroy()
 
 
 class RegionSelector:
@@ -617,7 +823,7 @@ class RegionSelector:
 
 
 def start_app():
-    """Start the main application after auth"""
+    """Start the main application after auth and setup"""
     # Import heavy modules only after auth
     global scan_for_ores, calculate_forge, ORES, RARITY_COLORS
     from ocr_scanner import scan_for_ores
@@ -626,6 +832,21 @@ def start_app():
     
     app = ForgerCompanion()
     app.run()
+
+
+def start_with_setup():
+    """Check if setup is needed, then start app"""
+    from config import is_setup_complete
+    from setup_wizard import SetupWizard
+    
+    if not is_setup_complete():
+        # Show setup wizard
+        print("First time setup...")
+        wizard = SetupWizard(on_complete=start_app)
+        wizard.run()
+    else:
+        # Setup already done, start app
+        start_app()
 
 
 def main():
@@ -637,14 +858,14 @@ def main():
     result = check_license()
     
     if result.get("valid"):
-        # License valid, start app
+        # License valid, check setup
         info = get_license_info()
         print(f"License active - {info.get('days_left', '?')} days remaining")
-        start_app()
+        start_with_setup()
     else:
         # Show activation window
         print(f"License check: {result.get('error', 'Not activated')}")
-        auth = AuthWindow(on_success=start_app)
+        auth = AuthWindow(on_success=start_with_setup)
         auth.run()
 
 
