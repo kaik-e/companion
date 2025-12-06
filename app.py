@@ -1,11 +1,146 @@
 """Forger Companion - Overlay App with EasyOCR"""
 
 import tkinter as tk
+from tkinter import messagebox
 import threading
 import time
-from ocr_scanner import scan_for_ores
-from calculator import calculate_forge
-from data import ORES, RARITY_COLORS, calculate_weapon_damage, calculate_masterwork_price, format_price
+import sys
+
+# Auth check before heavy imports
+from auth import check_license, validate_key, get_license_info
+
+
+class AuthWindow:
+    """License activation window"""
+    
+    def __init__(self, on_success):
+        self.on_success = on_success
+        self.root = tk.Tk()
+        self.root.title("Forger Companion - Activation")
+        self.root.geometry("400x280")
+        self.root.resizable(False, False)
+        self.root.configure(bg="#0d0d0d")
+        
+        # Center window
+        self.root.eval('tk::PlaceWindow . center')
+        
+        # Logo/Title
+        tk.Label(
+            self.root,
+            text="⚒ Forger Companion",
+            font=("Arial", 18, "bold"),
+            bg="#0d0d0d",
+            fg="#ffffff"
+        ).pack(pady=(30, 5))
+        
+        tk.Label(
+            self.root,
+            text="Enter your license key to activate",
+            font=("Arial", 10),
+            bg="#0d0d0d",
+            fg="#9a9a9a"
+        ).pack(pady=(0, 20))
+        
+        # Key entry
+        self.key_var = tk.StringVar()
+        self.key_entry = tk.Entry(
+            self.root,
+            textvariable=self.key_var,
+            font=("Consolas", 14),
+            width=20,
+            justify="center",
+            bg="#1a1a1a",
+            fg="#ffffff",
+            insertbackground="#ffffff",
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground="#333",
+            highlightcolor="#ffdb4a"
+        )
+        self.key_entry.pack(pady=10, ipady=8)
+        self.key_entry.focus()
+        
+        # Placeholder
+        self.key_entry.insert(0, "FORGER-XXXXXX")
+        self.key_entry.bind("<FocusIn>", self.clear_placeholder)
+        self.key_entry.bind("<Return>", lambda e: self.activate())
+        
+        # Activate button
+        self.activate_btn = tk.Button(
+            self.root,
+            text="Activate",
+            command=self.activate,
+            font=("Arial", 11, "bold"),
+            bg="#2d5a2d",
+            fg="#ffffff",
+            relief=tk.FLAT,
+            padx=30,
+            pady=8,
+            cursor="hand2"
+        )
+        self.activate_btn.pack(pady=15)
+        
+        # Status label
+        self.status_label = tk.Label(
+            self.root,
+            text="",
+            font=("Arial", 9),
+            bg="#0d0d0d",
+            fg="#ff4444"
+        )
+        self.status_label.pack(pady=5)
+        
+        # Footer
+        tk.Label(
+            self.root,
+            text="Get a key from the Forger Discord bot",
+            font=("Arial", 8),
+            bg="#0d0d0d",
+            fg="#666"
+        ).pack(side=tk.BOTTOM, pady=10)
+    
+    def clear_placeholder(self, event):
+        if self.key_var.get() == "FORGER-XXXXXX":
+            self.key_entry.delete(0, tk.END)
+    
+    def activate(self):
+        key = self.key_var.get().strip().upper()
+        
+        if not key or key == "FORGER-XXXXXX":
+            self.status_label.config(text="Please enter a license key")
+            return
+        
+        if not key.startswith("FORGER-"):
+            self.status_label.config(text="Invalid key format")
+            return
+        
+        self.status_label.config(text="Validating...", fg="#ffdb4a")
+        self.activate_btn.config(state=tk.DISABLED)
+        self.root.update()
+        
+        # Validate in background
+        def do_validate():
+            result = validate_key(key)
+            self.root.after(0, lambda: self.handle_result(result))
+        
+        threading.Thread(target=do_validate, daemon=True).start()
+    
+    def handle_result(self, result):
+        self.activate_btn.config(state=tk.NORMAL)
+        
+        if result.get("valid"):
+            self.status_label.config(text="✓ Activated!", fg="#4ade80")
+            self.root.after(1000, self.success)
+        else:
+            error = result.get("error", "Activation failed")
+            self.status_label.config(text=f"✗ {error}", fg="#ff4444")
+    
+    def success(self):
+        self.root.destroy()
+        self.on_success()
+    
+    def run(self):
+        self.root.mainloop()
 
 
 class ForgerCompanion:
@@ -123,8 +258,18 @@ class ForgerCompanion:
         self.armor_traits_label.pack(pady=2)
         
         # Status bar at bottom
-        self.status_label = tk.Label(self.root, text="Click Scan to start", font=("Arial", 8), bg="#1a1a1a", fg="#666", anchor=tk.W)
-        self.status_label.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
+        status_frame = tk.Frame(self.root, bg="#1a1a1a")
+        status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=10, pady=5)
+        
+        self.status_label = tk.Label(status_frame, text="Click Scan to start", font=("Arial", 8), bg="#1a1a1a", fg="#666", anchor=tk.W)
+        self.status_label.pack(side=tk.LEFT)
+        
+        # License info
+        info = get_license_info()
+        if info.get("active"):
+            days = info.get("days_left", 0)
+            color = "#4ade80" if days > 7 else "#ffdb4a" if days > 1 else "#ff4444"
+            tk.Label(status_frame, text=f"License: {days}d", font=("Arial", 8), bg="#1a1a1a", fg=color).pack(side=tk.RIGHT)
         
         # Debug (hidden by default)
         self.debug_frame = tk.Frame(self.root, bg=self.bg_color)
@@ -409,7 +554,37 @@ class RegionSelector:
         self.window.destroy()
 
 
-if __name__ == "__main__":
-    print("Starting Forger Companion...")
+def start_app():
+    """Start the main application after auth"""
+    # Import heavy modules only after auth
+    global scan_for_ores, calculate_forge, ORES, RARITY_COLORS
+    from ocr_scanner import scan_for_ores
+    from calculator import calculate_forge
+    from data import ORES, RARITY_COLORS
+    
     app = ForgerCompanion()
     app.run()
+
+
+def main():
+    """Main entry point with auth check"""
+    print("Starting Forger Companion...")
+    
+    # Check for existing valid license
+    print("Checking license...")
+    result = check_license()
+    
+    if result.get("valid"):
+        # License valid, start app
+        info = get_license_info()
+        print(f"License active - {info.get('days_left', '?')} days remaining")
+        start_app()
+    else:
+        # Show activation window
+        print(f"License check: {result.get('error', 'Not activated')}")
+        auth = AuthWindow(on_success=start_app)
+        auth.run()
+
+
+if __name__ == "__main__":
+    main()
